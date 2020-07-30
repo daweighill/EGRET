@@ -1,0 +1,161 @@
+---
+title: "Final EGRET v1: testing alpaca on a banovich network"
+author: "Deborah Weighill"
+date: "June 18, 2020"
+output:
+  html_notebook:
+    toc: true
+    theme: cosmo
+    df_print: paged
+---
+
+
+# Overview
+This script validates the PANDA and EGRET networks against ChIP-seq data.
+
+
+# Libraries, tags and inputs
+Load libraries, set tag
+
+```{r}
+library(rtracklayer)
+library(tidyr)
+library(pROC)
+library(reshape)
+library(PRROC)
+library(dplyr)
+library(precrec)
+library(ggplot2)
+
+```
+
+# Make Panda/EGRET edge table
+
+Load all of the PANDA/EGRET regnets
+
+```{r echo=FALSE,results='hide'}
+library(reshape2)
+
+load("../outputs/finalEgret_v1_banovich_LCL_06242020_1_panda.RData")
+net <- melt(regnet)
+colnames(net) = c("tf","gene","score")
+net$id <- paste0(net$tf,net$gene)
+
+regnet_edge_table <- data.frame(net$id)
+colnames(regnet_edge_table) <- c("id")
+regnet_edge_table$tf <- as.vector(net$tf)
+regnet_edge_table$gene <- as.vector(net$gene)
+regnet_edge_table$panda <- as.vector(net$score)
+
+#list of the file names of the rest of the networks
+files <- c("finalEgret_v1_banovich_LCL_06242020_10_egret.RData")
+
+#nicknames of the networks
+names <- c("LCL_10")
+
+
+
+for (p in c(1:1)) {
+  filename <- paste0("../outputs/",files[p])
+  netname <- names[p]
+  print(netname)
+  load(filename)
+  net <- melt(regnet)
+  colnames(net) = c("tf","gene","score")
+  net$id <- paste0(net$tf,net$gene)
+  if(all.equal(as.vector(regnet_edge_table$id),as.vector(net$id))){
+    print(p)
+    regnet_edge_table$tempID <- as.vector(net$score)
+    #print(colnames(regnet_edge_table))
+    colnames(regnet_edge_table)[colnames(regnet_edge_table) == "tempID"] <- netname
+  }
+}
+```
+  
+library(Matrix)
+library(igraph)
+library(GOstats)
+library("org.Hs.eg.db")
+library(condor)
+library(GO.db)
+```{r}
+library(Matrix)
+library(igraph)
+library(GOstats)
+library("org.Hs.eg.db")
+library(condor)
+library(GO.db)
+library(ALPACA)
+alpaca <- alpaca(regnet_edge_table[,c(2,3,4,5)], "~/EGRET/final_egret_v1/outputs/testAlpaca.txt", verbose = T)
+```
+
+```{r}
+alpaca_matrix <- as.data.frame(cbind(as.vector(names(alpaca[[2]])),as.vector(alpaca[[1]]),as.numeric(as.vector(alpaca[[2]]))))
+colnames(alpaca_matrix) <- c("node","cluster","score")
+alpaca_matrix <- separate(alpaca_matrix, node, c("gene_or_tf", "part"), "_", remove = TRUE)
+alpaca_matrix[which(as.numeric(as.vector(alpaca_matrix$score)) > 0.03),]
+hist(as.numeric(as.vector(alpaca_matrix[which(as.numeric(as.vector(alpaca_matrix$score)) > 0.01),"score"])))
+```
+
+# Load gwas
+```{r}
+
+# load gene annotation to assign gene id to gene name
+nameGeneMap <- read.table("../../final_egret_v1/annotation/geneID_name_map.txt", header = FALSE)
+colnames(nameGeneMap) <- c("gene","name")
+
+RA <- read.table("../gwas/RA_gwas_parsed.txt", header = FALSE,  sep = "\t")
+colnames(RA) <- c("RAtrait","name")
+RA$gene <- nameGeneMap$gene[match(RA$name, nameGeneMap$name)]
+
+CD <- read.table("../gwas/CD_gwas_parsed.txt", header = FALSE,  sep = "\t")
+colnames(CD) <- c("CDtrait","name")
+CD$gene <- nameGeneMap$gene[match(CD$name, nameGeneMap$name)]
+CD_nodes <- unique(c(as.vector(CD$name),as.vector(CD$gene)))
+
+
+CAD <- read.table("../gwas/CAD_gwas_parsed.txt", header = FALSE,  sep = "\t")
+colnames(CAD) <- c("CADtrait","name")
+CAD$gene <- nameGeneMap$gene[match(CAD$name, nameGeneMap$name)]
+
+BMI <- read.table("../gwas/BMI_gwas_parsed.txt", header = FALSE,  sep = "\t")
+colnames(BMI) <- c("BMItrait","name")
+BMI$gene <- nameGeneMap$gene[match(BMI$name, nameGeneMap$name)]
+
+MS <- read.table("../gwas/MS_gwas_parsed.txt", header = FALSE,  sep = "\t")
+colnames(MS) <- c("MStrait","name")
+MS$gene <- nameGeneMap$gene[match(MS$name, nameGeneMap$name)]
+
+MI <- read.table("../gwas/MI_gwas_parsed.txt", header = FALSE,  sep = "\t")
+colnames(MI) <- c("MItrait","name")
+MI$gene <- nameGeneMap$gene[match(MI$name, nameGeneMap$name)]
+
+```
+
+
+```{r}
+alpaca_matrix$GWAS_CD_tf <- ifelse(((alpaca_matrix$gene_or_tf %in% CD$name) | (alpaca_matrix$gene_or_tf %in% CD$gene)), 1, 0)
+alpaca_matrix$GWAS_CAD_tf <- ifelse(((alpaca_matrix$gene_or_tf %in% CAD$name) | (alpaca_matrix$gene_or_tf %in% CAD$gene)), 1, 0)
+alpaca_matrix$GWAS_MI_tf <- ifelse(((alpaca_matrix$gene_or_tf %in% MI$name) | (alpaca_matrix$gene_or_tf %in% MI$gene)), 1, 0)
+alpaca_matrix$GWAS_MS_tf <- ifelse(((alpaca_matrix$gene_or_tf %in% MS$name) | (alpaca_matrix$gene_or_tf %in% MS$gene)), 1, 0)
+alpaca_matrix$GWAS_RA_tf <- ifelse(((alpaca_matrix$gene_or_tf %in% RA$name) | (alpaca_matrix$gene_or_tf %in% RA$gene)), 1, 0)
+alpaca_matrix$GWAS_BMI_tf <- ifelse(((alpaca_matrix$gene_or_tf %in% BMI$name) | (alpaca_matrix$gene_or_tf %in% BMI$gene)), 1, 0)
+
+alpaca_matrix$sum <- alpaca_matrix$GWAS_CD_tf + alpaca_matrix$GWAS_CAD_tf
+
+
+```
+
+
+```{r}
+t.test(as.numeric(as.vector(alpaca_matrix[which(alpaca_matrix$GWAS_CAD_tf == 1),]$score)),as.numeric(as.vector(alpaca_matrix[which(alpaca_matrix$GWAS_CAD_tf == 0),]$score)), alternative="greater")
+
+t.test(as.numeric(as.vector(alpaca_matrix[which(alpaca_matrix$GWAS_CD_tf == 1),]$score)),as.numeric(as.vector(alpaca_matrix[which(alpaca_matrix$GWAS_CD_tf == 0),]$score)), alternative="greater")
+
+t.test(as.numeric(as.vector(alpaca_matrix[which(alpaca_matrix$sum != 0),]$score)),as.numeric(as.vector(alpaca_matrix[which(alpaca_matrix$sum == 0),]$score)), alternative="greater")
+
+list <- alpaca_matrix[order(-as.numeric(as.vector(alpaca_matrix$score))),1]
+TestNodeRank(list, unique(CD_nodes))
+```
+
+

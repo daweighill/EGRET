@@ -1,0 +1,276 @@
+---
+title: "Final EGRET v1 Banovich - Application to Banovich data"
+author: "Deborah Weighill"
+date: "June 17, 2020"
+output:
+  html_notebook:
+    toc: true
+    theme: cosmo
+    df_print: paged
+---
+
+# Description
+
+Preprocess data for Banovich application.
+
+# Load libraries
+```{r}
+library(GenomicRanges)
+library(tidyr)
+library(data.table)
+library(preprocessCore)
+```
+
+# Gene annotation
+
+```{r}
+# read in the gene annotation file with gene ranges.
+genes <- read.table("../../final_egret_v1/annotation/ensembl_genes_from_ucsc.txt", header = TRUE,sep = "\t")
+
+# for UCSC gene annotations, if the gene is on the negative strand the txStart is actually the txEnd. Also with UCSC, txStart needs a +1 because of the 0-based system.
+genes$promotorLeft <- ifelse(genes$strand == "+", (genes$txStart + 1 - 750), (genes$txEnd-250))
+genes$promotorRight <- ifelse(genes$strand == "+", (genes$txStart + 1 + 250), (genes$txEnd+750))
+
+# make a granges object of these promotor ranges
+gr_genes_promotor <- GRanges(seqnames = genes$chrom, ranges = IRanges(start = genes$promotorLeft, end = genes$promotorRight), strand = NULL, mcols = genes[,13:15])
+```
+
+# Motif data
+
+We use motif data from ~/EGRET/final_egret_v1/
+
+
+# Map eQTLs to motifs within promotors
+## LCLs
+```{r}
+# load eQTL data and overlap with motifs
+eqtl <- read.table("../data/LCL/output_RNAseqGeuvadis_PC14.txt", header = 1)
+#split the first column to get chromosome, position and ID columns and add the "chr" tag
+eqtl <- separate(eqtl, snps, c("chr", "pos"), "\\.", remove = FALSE)
+eqtl <- separate(eqtl, gene, c("geneID"), "\\.", remove = TRUE)
+#select significant associations
+eqtl_signif <- eqtl[which(eqtl$pvalue <= 1e-5),]
+#Convert the data into a GRanges object
+gr_eqtl <- GRanges(seqnames = eqtl_signif$chr, ranges = IRanges(start = as.numeric(eqtl_signif$pos), end = as.numeric(eqtl_signif$pos)), strand = NULL, mcols=eqtl_signif[,c("geneID", "pvalue","beta")])
+
+ 
+  # make motif-eGene network
+  motifs <- list.files(path="/home/ubuntu/EGRET/final_egret_v1/motifs/mapped_motif_files/", pattern="*.txt", full.names=TRUE, recursive=FALSE)
+  lapply(motifs, function(y) {
+    # load file
+    motif <- read.table(y, header = FALSE, sep = "\t")
+    motif_name <- motif[1,1]
+    print(motif_name)
+    colnames(motif) <- c("motifName","chr","start","stop","adjacentGene")
+    gr_motif <- GRanges(seqnames = motif[,2], ranges = IRanges(start = motif[,3], end = motif[,4]), strand = NULL, mcols = motif[,c(1,5)])
+  
+    eqtl_motif_overlap <- data.frame(findOverlaps(gr_eqtl,gr_motif))
+    eqtl_motif_overlap$tfName <- gr_motif$mcols.motifName[eqtl_motif_overlap$subjectHits]
+    eqtl_motif_overlap$adjacentGene <- gr_motif$mcols.adjacentGene[eqtl_motif_overlap$subjectHits]
+    eqtl_motif_overlap$eGene <- gr_eqtl$mcols.geneID[eqtl_motif_overlap$queryHits]
+    eqtl_motif_overlap$snpPos <- start(gr_eqtl)[eqtl_motif_overlap$queryHits]
+    eqtl_motif_overlap$chr <- as.vector(seqnames(gr_eqtl))[eqtl_motif_overlap$queryHits]
+    eqtl_motif_overlap$pval <- gr_eqtl$mcols.pvalue[eqtl_motif_overlap$queryHits]
+    eqtl_motif_overlap$beta <- gr_eqtl$mcols.beta[eqtl_motif_overlap$queryHits]
+    indices <- which(as.vector(eqtl_motif_overlap$eGene) == as.vector(eqtl_motif_overlap$adjacentGene))
+    eQTL_in_promotor_adjacent_egene <- eqtl_motif_overlap[indices,]
+  
+    filename <- paste0("../inputs/LCL_eQTL_in_motif_promotor_adjacent_egene_banovich_finalEGRET_v1_06172020.txt")
+    # write to file
+    write.table(x = unique(eQTL_in_promotor_adjacent_egene[,c(3,4,6,7,9)]), file = filename, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE, append = TRUE)
+  })
+
+```
+
+## iPSC
+We first need to add some "null ids" for those SNPs with missing rsids.
+
+```{r}
+system("perl /home/ubuntu/EGRET/final_egret_v1_banovich/scripts/parse_eqtl_ipsc.pl")
+```
+
+```{r}
+# load eQTL data and overlap with motifs
+eqtl <- read.table("../data/iPSC/iPSC-eQTL-summary_formatted.txt", header = FALSE)
+colnames(eqtl) <- c("gene", "SNP", "distance","pvalue", "beta")
+#split the first column to get chromosome, position and ID columns and add the "chr" tag
+eqtl <- separate(eqtl, SNP, c("id","chr", "pos"), "\\.", remove = FALSE)
+eqtl <- separate(eqtl, gene, c("geneID"), "\\.", remove = TRUE)
+# select significant snps
+eqtl_signif <- eqtl[which(eqtl$pvalue <= 1e-5),]
+
+#Convert the data into a GRanges object
+gr_eqtl <- GRanges(seqnames = eqtl_signif$chr, ranges = IRanges(start = as.numeric(eqtl_signif$pos), end = as.numeric(eqtl_signif$pos)), strand = NULL, mcols=eqtl_signif[,c("geneID", "pvalue","beta")])
+
+ 
+  # make motif-eGene network
+  motifs <- list.files(path="/home/ubuntu/EGRET/final_egret_v1/motifs/mapped_motif_files/", pattern="*.txt", full.names=TRUE, recursive=FALSE)
+  lapply(motifs, function(y) {
+    # load file
+    motif <- read.table(y, header = FALSE, sep = "\t")
+    motif_name <- motif[1,1]
+    print(motif_name)
+    colnames(motif) <- c("motifName","chr","start","stop","adjacentGene")
+    gr_motif <- GRanges(seqnames = motif[,2], ranges = IRanges(start = motif[,3], end = motif[,4]), strand = NULL, mcols = motif[,c(1,5)])
+  
+    eqtl_motif_overlap <- data.frame(findOverlaps(gr_eqtl,gr_motif))
+    eqtl_motif_overlap$tfName <- gr_motif$mcols.motifName[eqtl_motif_overlap$subjectHits]
+    eqtl_motif_overlap$adjacentGene <- gr_motif$mcols.adjacentGene[eqtl_motif_overlap$subjectHits]
+    eqtl_motif_overlap$eGene <- gr_eqtl$mcols.geneID[eqtl_motif_overlap$queryHits]
+    eqtl_motif_overlap$snpPos <- start(gr_eqtl)[eqtl_motif_overlap$queryHits]
+    eqtl_motif_overlap$chr <- as.vector(seqnames(gr_eqtl))[eqtl_motif_overlap$queryHits]
+    eqtl_motif_overlap$pval <- gr_eqtl$mcols.pvalue[eqtl_motif_overlap$queryHits]
+    eqtl_motif_overlap$beta <- gr_eqtl$mcols.beta[eqtl_motif_overlap$queryHits]
+    indices <- which(as.vector(eqtl_motif_overlap$eGene) == as.vector(eqtl_motif_overlap$adjacentGene))
+    eQTL_in_promotor_adjacent_egene <- eqtl_motif_overlap[indices,]
+  
+    filename <- paste0("../inputs/iPSC_eQTL_in_motif_promotor_adjacent_egene_banovich_finalEGRET_v1_06172020.txt")
+    # write to file
+    write.table(x = unique(eQTL_in_promotor_adjacent_egene[,c(3,4,6,7,9)]), file = filename, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE, append = TRUE)
+  })
+```
+
+## iPSC-CM
+```{r}
+# load eQTL data and overlap with motifs
+eqtl <- read.table("../data/iPSC-CM/eQTL_WASP_CM.txt", header = TRUE)
+
+#split the third column column to get gene name
+eqtl <- separate(eqtl, TEST_NAME, c("chrom","snpPos","eGene"), "_", remove = FALSE)
+
+# select significant snps
+eqtl_signif <- eqtl[which(eqtl$P.VALUE <= 1e-5),]
+#Convert the data into a GRanges object
+gr_eqtl <- GRanges(seqnames = eqtl_signif$chrom, ranges = IRanges(start = as.numeric(eqtl_signif$snpPos), end = as.numeric(eqtl_signif$snpPos)), strand = NULL, mcols=eqtl_signif[,c("eGene", "P.VALUE","BETA")])
+
+ 
+  # make motif-eGene network
+  motifs <- list.files(path="/home/ubuntu/EGRET/final_egret_v1/motifs/mapped_motif_files/", pattern="*.txt", full.names=TRUE, recursive=FALSE)
+  lapply(motifs, function(y) {
+    # load file
+    motif <- read.table(y, header = FALSE, sep = "\t")
+    motif_name <- motif[1,1]
+    print(motif_name)
+    colnames(motif) <- c("motifName","chr","start","stop","adjacentGene")
+    gr_motif <- GRanges(seqnames = motif[,2], ranges = IRanges(start = motif[,3], end = motif[,4]), strand = NULL, mcols = motif[,c(1,5)])
+  
+    eqtl_motif_overlap <- data.frame(findOverlaps(gr_eqtl,gr_motif))
+    eqtl_motif_overlap$tfName <- gr_motif$mcols.motifName[eqtl_motif_overlap$subjectHits]
+    eqtl_motif_overlap$adjacentGene <- gr_motif$mcols.adjacentGene[eqtl_motif_overlap$subjectHits]
+    eqtl_motif_overlap$eGene <- gr_eqtl$mcols.eGene[eqtl_motif_overlap$queryHits]
+    eqtl_motif_overlap$snpPos <- start(gr_eqtl)[eqtl_motif_overlap$queryHits]
+    eqtl_motif_overlap$chr <- as.vector(seqnames(gr_eqtl))[eqtl_motif_overlap$queryHits]
+    eqtl_motif_overlap$pval <- gr_eqtl$mcols.P.VALUE[eqtl_motif_overlap$queryHits]
+    eqtl_motif_overlap$beta <- gr_eqtl$mcols.BETA[eqtl_motif_overlap$queryHits]
+    indices <- which(as.vector(eqtl_motif_overlap$eGene) == as.vector(eqtl_motif_overlap$adjacentGene))
+    eQTL_in_promotor_adjacent_egene <- eqtl_motif_overlap[indices,]
+  
+    filename <- paste0("../inputs/iPSCCM_eQTL_in_motif_promotor_adjacent_egene_banovich_finalEGRET_v1_06172020.txt")
+    # write to file
+    write.table(unique(eQTL_in_promotor_adjacent_egene[,c(3,4,6,7,9)]), file = filename, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE, append = TRUE)
+  })
+
+```
+
+# Make vcf files for eQTLs in motif in promotor for each genotype
+## LCL
+
+```{r}
+motif_promotor_eqtls <- read.table("../inputs/LCL_eQTL_in_motif_promotor_adjacent_egene_banovich_finalEGRET_v1_06172020.txt", header = FALSE)
+colnames(motif_promotor_eqtls) <- c("tf","adjGene","snpPos","chrom","beta")
+motif_promotor_eqtls$chromPos <- paste0(motif_promotor_eqtls$chrom,"_",motif_promotor_eqtls$snpPos)
+
+genotype <- read.table("../data/genotypes/genotypes_5col.vcf", sep = "\t" ,header = FALSE)
+colnames(genotype) <- c("chr","pos","snp_id","ref","alt")
+genotype$chromPos <- paste0(genotype$chr,"_",genotype$pos)
+  
+#select positions where there are eQTLs
+genotype_eqtls <- motif_promotor_eqtls[which(motif_promotor_eqtls$chromPos %in% genotype$chromPos),]
+genotype_eqtls$ref <- genotype$ref[match(genotype_eqtls$chromPos,genotype$chromPos)]
+genotype_eqtls$alt <- genotype$alt[match(genotype_eqtls$chromPos,genotype$chromPos)]
+   
+genotype_eqtls_noIndels <- genotype_eqtls[(nchar(as.character(genotype_eqtls$ref)) == 1) & (nchar(as.character(genotype_eqtls$alt)) == 1),c(4,3,2,7,8)]
+eqtl_vcf <- paste0("../data/genotypes/LCL_eQTL_motif_promotor_finalEgret_v1_banovich_06172020.vcf")
+write.table(unique(genotype_eqtls_noIndels), file =eqtl_vcf, col.names = FALSE, sep = "\t", quote = FALSE, row.names = FALSE)
+```
+
+## iPSC
+
+```{r}
+motif_promotor_eqtls <- read.table("../inputs/iPSC_eQTL_in_motif_promotor_adjacent_egene_banovich_finalEGRET_v1_06172020.txt", header = FALSE)
+colnames(motif_promotor_eqtls) <- c("tf","adjGene","snpPos","chrom","beta")
+motif_promotor_eqtls$chromPos <- paste0(motif_promotor_eqtls$chrom,"_",motif_promotor_eqtls$snpPos)
+
+genotype <- read.table("../data/genotypes/genotypes_5col.vcf", sep = "\t" ,header = FALSE)
+colnames(genotype) <- c("chr","pos","snp_id","ref","alt")
+genotype$chromPos <- paste0(genotype$chr,"_",genotype$pos)
+  
+#select positions where there are eQTLs
+genotype_eqtls <- motif_promotor_eqtls[which(motif_promotor_eqtls$chromPos %in% genotype$chromPos),]
+genotype_eqtls$ref <- genotype$ref[match(genotype_eqtls$chromPos,genotype$chromPos)]
+genotype_eqtls$alt <- genotype$alt[match(genotype_eqtls$chromPos,genotype$chromPos)]
+   
+genotype_eqtls_noIndels <- genotype_eqtls[(nchar(as.character(genotype_eqtls$ref)) == 1) & (nchar(as.character(genotype_eqtls$alt)) == 1),c(4,3,2,7,8)]
+eqtl_vcf <- paste0("../data/genotypes/iPSC_eQTL_motif_promotor_finalEgret_v1_banovich_06172020.vcf")
+write.table(unique(genotype_eqtls_noIndels), file =eqtl_vcf, col.names = FALSE, sep = "\t", quote = FALSE, row.names = FALSE)
+```
+
+
+## iPSC-CM
+
+```{r}
+motif_promotor_eqtls <- read.table("../inputs/iPSCCM_eQTL_in_motif_promotor_adjacent_egene_banovich_finalEGRET_v1_06172020.txt", header = FALSE)
+colnames(motif_promotor_eqtls) <- c("tf","adjGene","snpPos","chrom","beta")
+motif_promotor_eqtls$chromPos <- paste0(motif_promotor_eqtls$chrom,"_",motif_promotor_eqtls$snpPos)
+
+genotype <- read.table("../data/genotypes/genotypes_5col.vcf", sep = "\t" ,header = FALSE)
+colnames(genotype) <- c("chr","pos","snp_id","ref","alt")
+genotype$chromPos <- paste0(genotype$chr,"_",genotype$pos)
+  
+#select positions where there are eQTLs
+genotype_eqtls <- motif_promotor_eqtls[which(motif_promotor_eqtls$chromPos %in% genotype$chromPos),]
+genotype_eqtls$ref <- genotype$ref[match(genotype_eqtls$chromPos,genotype$chromPos)]
+genotype_eqtls$alt <- genotype$alt[match(genotype_eqtls$chromPos,genotype$chromPos)]
+   
+genotype_eqtls_noIndels <- genotype_eqtls[(nchar(as.character(genotype_eqtls$ref)) == 1) & (nchar(as.character(genotype_eqtls$alt)) == 1),c(4,3,2,7,8)]
+eqtl_vcf <- paste0("../data/genotypes/iPSC-CM_eQTL_motif_promotor_finalEgret_v1_banovich_06172020.vcf")
+write.table(unique(genotype_eqtls_noIndels), file =eqtl_vcf, col.names = FALSE, sep = "\t", quote = FALSE, row.names = FALSE)
+```
+
+
+# Make expression matrix
+
+## LCL
+These are WASP + qqnorm proccessed, as shown on the website we got the data 
+http://eqtl.uchicago.edu/jointLCL/
+```{r}
+expr <- fread("../data/LCL/fastqtl_qqnorm_RNAseqGeuvadis_phase2.txt", header = TRUE, skip = 0, drop = c(1,2,3), data.table = FALSE)
+expr$ID<-sub("\\.[0-9]","", expr$ID)
+expr_df <- data.frame(expr, row.names = 1)
+save(expr_df, file = "../inputs/LCL_expr_data_finalEgret_v1_banovich_06172020.RData")
+```
+
+## iPSC 
+Note - These are also WASP + qqnorm processed, as detailed in the series matrix file from GEO https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE107654.
+```{r}
+expr <- fread("../data/iPSC/GSE107654_iPSC_processed_counts.txt", header = TRUE, skip = 0, data.table = FALSE)
+expr$gene<-sub("\\.[0-9]","", expr$gene)
+expr_df <- data.frame(expr, row.names = 1)
+save(expr_df, file = "../inputs/iPSC_expr_data_finalEgret_v1_banovich_06172020.RData")
+```
+
+## iPSC-CM
+Note - These are also WASP processed, but they are raw counts sas detailed in the series matrix file from GEO https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE107654. We need to standardize the rows (genes) and qqnorm the columns (individuals).
+```{r}
+expr <- fread("../data/iPSC-CM/GSE107654_iPSC-CM_counts.txt", header = TRUE, skip = 0, data.table = FALSE)
+expr_df <- data.frame(expr, row.names = 1)
+stdev <- apply(expr_df, MARGIN = 1, FUN = sd)
+expr_standardized <- t(scale(t(as.matrix(expr_df[which(stdev != 0),])), center = TRUE, scale = TRUE))
+expr_qqnorm <- normalize.quantiles(expr_standardized)
+rownames(expr_qqnorm) <- rownames(expr_standardized)
+colnames(expr_qqnorm) <- colnames(expr_standardized)
+
+save(expr_qqnorm, file = "../inputs/iPSC-CM_expr_data_finalEgret_v1_banovich_06172020.RData")
+```
+
+

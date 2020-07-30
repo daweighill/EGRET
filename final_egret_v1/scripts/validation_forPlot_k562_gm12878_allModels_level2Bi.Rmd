@@ -1,0 +1,149 @@
+---
+title: "Final EGRET - v1 Validation for plotting"
+author: "Deborah Weighill"
+date: "June 29, 2019"
+output:
+  html_notebook:
+    toc: true
+    theme: cosmo
+    df_print: paged
+---
+
+
+Here we validate the PANDA and EGRET networks against ChIP-seq data.
+
+
+# Make Panda/EGRET edge table
+
+Load all of the PANDA/EGRET regnets
+
+```{r echo=FALSE,results='hide'}
+library(reshape2)
+# panda"
+"../outputs/"
+load("../outputs/finalEgret_v1_na12878_eQTLs_06182020_panda.RData")
+net <- melt(regnet)
+colnames(net) = c("tf","gene","score")
+net$id <- paste0(net$tf,net$gene)
+
+regnet_edge_table <- data.frame(net$id)
+colnames(regnet_edge_table) <- c("id")
+regnet_edge_table$tf <- as.vector(net$tf)
+regnet_edge_table$gene <- as.vector(net$gene)
+regnet_edge_table$panda <- as.vector(net$score)
+
+#list of the file names of the rest of the networks
+files <- c("finalEgret_v1_na12878_allModels_level2Bi_06292020_egret.RData",
+           "finalEgret_v1_k562_allModels_level2Bi_06292020_egret.RData")
+
+#nicknames of the networks
+names <- c("egret_GM12878","egret_K562")
+
+for (p in c(1:2)) {
+  filename <- paste0("../outputs/",files[p])
+  netname <- names[p]
+  print(netname)
+  load(filename)
+  net <- melt(regnet)
+  colnames(net) = c("tf","gene","score")
+  net$id <- paste0(net$tf,net$gene)
+  if(all.equal(as.vector(regnet_edge_table$id),as.vector(net$id))){
+    print(p)
+    regnet_edge_table$tempID <- as.vector(net$score)
+    #print(colnames(regnet_edge_table))
+    colnames(regnet_edge_table)[colnames(regnet_edge_table) == "tempID"] <- netname
+  }
+}
+```
+
+
+```{r echo=FALSE,results='hide'}
+library(rtracklayer)
+library(tidyr)
+library(pROC)
+library(reshape)
+library(PRROC)
+library(dplyr)
+
+# read in the gene annotation file with gene ranges.
+genes <- read.table("../annotation/ensembl_genes_from_ucsc.txt", header = TRUE,sep = "\t")
+genes$promotorLeft <- ifelse(genes$strand == "+", (genes$txStart + 1 - 750), (genes$txEnd-250))
+genes$promotorRight <- ifelse(genes$strand == "+", (genes$txStart + 1 + 250), (genes$txEnd+750))
+gr_genes_promotor <- GRanges(seqnames = genes$chrom, ranges = IRanges(start = genes$promotorLeft, end = genes$promotorRight), strand = NULL, mcols = genes[,13:15])
+
+# GM12878 chipseq data
+gr_chipseq_gm12878 <- import("../../ca_egret/ca_egret_v3.1_LOO/validation/GM12878_remap2018_all_macs2_hg19_v1_2.bed")
+overlaps_gm12878 <- data.frame(findOverlaps(gr_chipseq_gm12878, gr_genes_promotor))
+overlaps_gm12878$tf_name <- gr_chipseq_gm12878$name[overlaps_gm12878$queryHits]
+overlaps_gm12878$gene_name <- gr_genes_promotor$mcols.name2[overlaps_gm12878$subjectHits]
+validation_regnet_gm12878 <- separate(overlaps_gm12878, tf_name, c("exp", "tf", "cell line"), "\\.")
+chipseq_regnet_gm12878 <- distinct(validation_regnet_gm12878[,c("tf","gene_name")])
+chipseq_regnet_gm12878$id <- paste0(chipseq_regnet_gm12878$tf,chipseq_regnet_gm12878$gene)
+
+# K562 chipseq data
+gr_chipseq_k562 <- import("../../ca_egret/ca_egret_v3.1_LOO/validation/K562_remap2018_all_macs2_hg19_v1_2.bed")
+overlaps_k562 <- data.frame(findOverlaps(gr_chipseq_k562, gr_genes_promotor))
+overlaps_k562$tf_name <- gr_chipseq_k562$name[overlaps_k562$queryHits]
+overlaps_k562$gene_name <- gr_genes_promotor$mcols.name2[overlaps_k562$subjectHits]
+validation_regnet_k562 <- separate(overlaps_k562, tf_name, c("exp", "tf", "cell line"), "\\.")
+chipseq_regnet_k562 <- distinct(validation_regnet_k562[,c("tf","gene_name")])
+chipseq_regnet_k562$id <- paste0(chipseq_regnet_k562$tf,chipseq_regnet_k562$gene)
+```
+
+# Overlap networks with ChIP-seq data
+We now filter down the panda/egret networks to only include those TFs which are in the ChIP-seq data (our validation set). We do the same for the prior networks.
+```{r echo=FALSE,results='hide'}
+# gm12878
+filtered_net_table_gm12878 <- regnet_edge_table[(regnet_edge_table$tf %in% chipseq_regnet_gm12878$tf) ,]
+filtered_net_table_gm12878$chipseq <- ifelse(filtered_net_table_gm12878$id %in% chipseq_regnet_gm12878$id,1,0)
+
+# k562 
+filtered_net_table_k562 <- regnet_edge_table[(regnet_edge_table$tf %in% chipseq_regnet_k562$tf) ,]
+filtered_net_table_k562$chipseq <- ifelse(filtered_net_table_k562$id %in% chipseq_regnet_k562$id,1,0)
+
+```
+
+
+# Validate highest difference edges with chipseq
+## GM12878
+```{r echo=FALSE,results='hide'}
+#calculate differences
+filtered_net_table_gm12878$diffEgretGM12878 <- abs(filtered_net_table_gm12878$egret_GM12878 - filtered_net_table_gm12878$panda)
+validation_table_gm12878 <- filtered_net_table_gm12878
+```
+
+
+
+## K562
+```{r echo=FALSE,results='hide'}
+#calculate differences
+filtered_net_table_k562$diffEgretK562 <- abs(filtered_net_table_k562$egret_K562 - filtered_net_table_k562$panda)
+
+validation_table_k562 <- filtered_net_table_k562
+```
+
+
+
+# Some specific examples
+```{r}
+comparison_table <- validation_table_gm12878[which(validation_table_gm12878$tf %in% validation_table_k562$tf),]
+colnames(comparison_table)[7] <- "chipseq_gm12878"
+comparison_table$chipseq_K562 <- ifelse(comparison_table$id %in% chipseq_regnet_k562$id,1,0)
+comparison_table$diffEgret_K562 <- abs(comparison_table$egret_K562 - comparison_table$panda)
+
+#motif_prior <- read.table("../outputs/panda_prior.txt", sep = "\t", header = TRUE)
+#motif_prior$id <- paste0(motif_prior$tf, motif_prior$gene)
+
+#comparison_table$motif_prior <- motif_prior$edgeP[match(comparison_table$id, motif_prior$id)]
+save(comparison_table, file = "../outputs/comparison_table.RData")
+```
+
+```{r}
+
+ex1 <- comparison_table[(comparison_table$chipseq_gm12878 != comparison_table$chipseq_K562) & (comparison_table$diffEgretGM12878 > 0.5),]
+
+ex1
+
+
+```
+
