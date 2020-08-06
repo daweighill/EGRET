@@ -39,7 +39,7 @@ net <- read.table("../alpaca/LCL_100_ALPACA_scores.txt", header = FALSE, sep = "
 colnames(net) = c("node","score")
 net <- separate(net, node, c("node","set"), "_", remove = TRUE)
 
-alpaca_score_table_LCL <- data.frame(net$node)
+alpaca_score_table_LCL <- data.frame(net$node[which(net$set == "B")])
 colnames(alpaca_score_table_LCL) = c("node")
 for (n in c(1:119)) {
   file <- paste0("../alpaca/LCL_",n,"_ALPACA_scores.txt")
@@ -50,7 +50,7 @@ for (n in c(1:119)) {
   alpaca_score_table_LCL$tempID <- net$score[match(alpaca_score_table_LCL$node, net$node)]
   colnames(alpaca_score_table_LCL)[colnames(alpaca_score_table_LCL) == "tempID"] <- paste0("LCL_indiv_",n)
   }
-save(alpaca_score_table_LCL, file = "../alpaca/LCL_alpaca_score_table.RData")
+save(alpaca_score_table_LCL, file = "../alpaca/LCL_alpaca_score_table_genes.RData")
 ```
 
 ## iPSC
@@ -59,7 +59,7 @@ net <- read.table("../alpaca/iPSC_100_ALPACA_scores.txt", header = FALSE, sep = 
 colnames(net) = c("node","score")
 net <- separate(net, node, c("node","set"), "_", remove = TRUE)
 
-alpaca_score_table_iPSC <- data.frame(net$node)
+alpaca_score_table_iPSC <- data.frame(net$node[which(net$set == "B")])
 colnames(alpaca_score_table_iPSC) = c("node")
 for (n in c(1:119)) {
   file <- paste0("../alpaca/iPSC_",n,"_ALPACA_scores.txt")
@@ -70,7 +70,7 @@ for (n in c(1:119)) {
   alpaca_score_table_iPSC$tempID <- net$score[match(alpaca_score_table_iPSC$node, net$node)]
   colnames(alpaca_score_table_iPSC)[colnames(alpaca_score_table_iPSC) == "tempID"] <- paste0("iPSC_indiv_",n)
   }
-save(alpaca_score_table_iPSC, file = "../alpaca/iPSC_alpaca_score_table.RData")
+save(alpaca_score_table_iPSC, file = "../alpaca/iPSC_alpaca_score_table_genes.RData")
 ```
 
 ## iPSC-CM
@@ -79,7 +79,7 @@ net <- read.table("../alpaca/iPSC-CM_100_ALPACA_scores.txt", header = FALSE, sep
 colnames(net) = c("node","score")
 net <- separate(net, node, c("node","set"), "_", remove = TRUE)
 
-alpaca_score_table_iPSCCM <- data.frame(net$node)
+alpaca_score_table_iPSCCM <- data.frame(net$node[which(net$set == "B")])
 colnames(alpaca_score_table_iPSCCM) = c("node")
 for (n in c(1:119)) {
   file <- paste0("../alpaca/iPSC-CM_",n,"_ALPACA_scores.txt")
@@ -90,7 +90,7 @@ for (n in c(1:119)) {
   alpaca_score_table_iPSCCM$tempID <- net$score[match(alpaca_score_table_iPSCCM$node, net$node)]
   colnames(alpaca_score_table_iPSCCM)[colnames(alpaca_score_table_iPSCCM) == "tempID"] <- paste0("iPSCCM_indiv_",n)
   }
-save(alpaca_score_table_iPSCCM, file = "../alpaca/iPSC-CM_alpaca_score_table.RData")
+save(alpaca_score_table_iPSCCM, file = "../alpaca/iPSC-CM_alpaca_score_table_genes.RData")
 ```
 
 
@@ -98,13 +98,13 @@ save(alpaca_score_table_iPSCCM, file = "../alpaca/iPSC-CM_alpaca_score_table.RDa
 This ensures that we are considering the same set of edges for the two tissues (LCL and iPSC).
 
 ```{r}
-#load("../alpaca/LCL_alpaca_score_table.RData")
-#load("../alpaca/iPSC_alpaca_score_table.RData")
-#load("../alpaca/iPSC-CM_alpaca_score_table.RData")
+load("../alpaca/LCL_alpaca_score_table_genes.RData")
+load("../alpaca/iPSC_alpaca_score_table_genes.RData")
+load("../alpaca/iPSC-CM_alpaca_score_table_genes.RData")
 
 pre_merged_alpaca_table <- merge(alpaca_score_table_LCL,alpaca_score_table_iPSC, by.x = c(1), by.y = c(1), all = FALSE)
 merged_alpaca_table <- merge(pre_merged_alpaca_table,alpaca_score_table_iPSCCM,by.x = c(1), by.y = c(1), all = FALSE)
-save(merged_alpaca_table, file = "../alpaca/merged_alpaca_table_07302020.RData")
+#save(merged_alpaca_table, file = "../alpaca/merged_alpaca_table_07302020_genes.RData")
 ```
 
 ```{r}
@@ -112,18 +112,18 @@ save(merged_alpaca_table, file = "../alpaca/merged_alpaca_table_07302020.RData")
 #load("../alpaca/iPSC_alpaca_score_table.RData")
 #load("../alpaca/iPSC-CM_alpaca_score_table.RData")
 
-lcl_alpaca_table_scaled <- cbind(as.data.frame(as.vector(alpaca_score_table_LCL[,c(1)])), (scale(abs(alpaca_score_table_LCL[c(2:120)]), center = TRUE, scale = TRUE)))
+lcl_alpaca_table_scaled <- cbind(as.data.frame(as.vector(alpaca_score_table_LCL[,c(1)])), (scale((alpaca_score_table_LCL[c(2:120)]), center = TRUE, scale = TRUE)))
 colnames(lcl_alpaca_table_scaled)[1] <- "node"
 
-ipsc_alpaca_table_scaled <- cbind(as.data.frame(as.vector(alpaca_score_table_iPSC[,c(1)])), (scale(abs(alpaca_score_table_iPSC[c(2:120)]), center = TRUE, scale = TRUE)))
+ipsc_alpaca_table_scaled <- cbind(as.data.frame(as.vector(alpaca_score_table_iPSC[,c(1)])), (scale((alpaca_score_table_iPSC[c(2:120)]), center = TRUE, scale = TRUE)))
 colnames(ipsc_alpaca_table_scaled)[1] <- "node"
 
-ipscCM_alpaca_table_scaled <- cbind(as.data.frame(as.vector(alpaca_score_table_iPSCCM[,c(1)])), (scale(abs(alpaca_score_table_iPSCCM[c(2:120)]), center = TRUE, scale = TRUE)))
+ipscCM_alpaca_table_scaled <- cbind(as.data.frame(as.vector(alpaca_score_table_iPSCCM[,c(1)])), (scale((alpaca_score_table_iPSCCM[c(2:120)]), center = TRUE, scale = TRUE)))
 colnames(ipscCM_alpaca_table_scaled)[1] <- "node"
 
 pre_merged_alpaca_table_scaled <- merge(lcl_alpaca_table_scaled,ipsc_alpaca_table_scaled, by.x = c(1), by.y = c(1), all = FALSE)
 merged_alpaca_table_scaled <- merge(pre_merged_alpaca_table_scaled,ipscCM_alpaca_table_scaled,by.x = c(1), by.y = c(1), all = FALSE)
-save(merged_alpaca_table_scaled, file = "../alpaca/merged_alpaca_table_07302020_scaled.RData")
+#save(merged_alpaca_table_scaled, file = "../alpaca/merged_alpaca_table_07302020_scaled_genes.RData")
 ```
 
 
@@ -175,12 +175,44 @@ alpaca_iPSC_CM$tissue <- "iPSC-CM"
 alpaca_melted <- rbind(alpaca_lcl,alpaca_iPSC,alpaca_iPSC_CM)
 colnames(alpaca_melted) <- c("node","individual","alpacaScore","Tissue")
 head(alpaca_melted)
-ggplot(alpaca_melted, aes(x=Tissue, y=alpacaScore, fill=Tissue, col = Tissue)) + geom_violin() + theme_bw() + scale_fill_manual(values=pallet) + scale_color_manual(values=pallet) + labs(title="Distribution of ALPACA Scores Scores", x ="Cell type", y = "ALPACA score") + theme(legend.position="none")
+p1 <- ggplot(alpaca_melted, aes(x=Tissue, y=alpacaScore, fill=Tissue, col = Tissue)) + geom_violin(alpha = 0.1) + theme_bw() + scale_fill_manual(values=pallet) + scale_color_manual(values=pallet) + labs(x ="Cell type", y = "ALPACA score") + theme(legend.position="none")
+
+
+p2 <- ggplot(alpaca_melted, aes(x=alpacaScore,  color=Tissue, fill = Tissue)) + geom_density(alpha = 0.1) + theme_bw() + scale_color_manual(values=pallet) + scale_fill_manual(values=pallet) +labs(title=NULL, x ="Scaled TF disruption score", y = "Frequency") 
+
+
+p3 <- grid.arrange(p1 + theme(legend.position="hidden"), p2 + theme(legend.position="right"), nrow=1, widths = c(6,7))
+p4 <- annotate_figure(p3,top = text_grob("Distribution of scaled ALPACA scores for genes", color = "black", face = "bold", size = 14))
+pdf("scaled_gene_alpaca_scores.pdf",width = 7, height = 3.5)
+plot(p4)
+dev.off()
+plot(p4)
+
+```
+
+plot distributions
+```{r}
+alpaca_table <- merged_alpaca_table_scaled
+alpaca_lcl <- melt(alpaca_table[,c(1,c(2:120))], id.vars = c("node"))
+alpaca_lcl$tissue <- "LCL"
+alpaca_iPSC <- melt(alpaca_table[,c(1,c(121:239))], id.vars = c("node"))
+alpaca_iPSC$tissue <- "iPSC"
+alpaca_iPSC_CM <- melt(alpaca_table[,c(1,c(240:358))], id.vars = c("node"))
+alpaca_iPSC_CM$tissue <- "iPSC-CM"
+alpaca_melted <- rbind(alpaca_lcl,alpaca_iPSC,alpaca_iPSC_CM)
+colnames(alpaca_melted) <- c("node","individual","alpacaScore","Tissue")
+head(alpaca_melted)
+
+p1 <- ggplot(alpaca_melted, aes(x=Tissue, y=alpacaScore, fill=Tissue, col = Tissue)) + geom_violin() + theme_bw() + scale_fill_manual(values=pallet) + scale_color_manual(values=pallet) + labs(title="Distribution of ALPACA Scores Scores", x ="Cell type", y = "ALPACA score") + theme(legend.position="none")
 
 ggplot(alpaca_melted, aes(x=alpacaScore,  color=Tissue)) + geom_density() + theme_bw() + scale_color_manual(values=pallet) +labs(title=NULL, x ="Scaled TF disruption score", y = "Frequency") 
 
 ggplot(alpaca_melted, aes(x=alpacaScore,  color=Tissue, fill = Tissue)) + geom_density(alpha = 0.1) + theme_bw() + scale_color_manual(values=pallet) + scale_fill_manual(values=pallet) +labs(title=NULL, x ="Scaled TF disruption score", y = "Frequency") +  xlim(0.001, 0.5)
 
+pdf("scaled_gene_alpaca_scores.pdf",width = 5, height = 3.5)
+p1
+dev.off()
+p1
 
 ```
 
@@ -193,7 +225,7 @@ cads_melted <- melt(cads)
 colnames(cads_melted) <- c("node","sample","alpaca_score")
 cads_melted <- separate(cads_melted, sample, c("cellType","tag", "indiv"), "_", remove = TRUE)
 
-ggplot(cads_melted) + geom_point(shape = 21, aes(x =indiv, y = abs(alpaca_score), col = cellType, fill = cellType, alpha = 0.1)) + theme_classic()+ scale_color_manual(values=pallet)+scale_fill_manual(values=pallet) + xlab("Individual")
+ggplot(cads_melted) + geom_point(shape = 21, aes(x =indiv, y = (alpaca_score), col = cellType, fill = cellType, alpha = 0.1)) + theme_classic()+ scale_color_manual(values=pallet)+scale_fill_manual(values=pallet) + xlab("Individual")
 
 ggplot(cads_melted[which(cads_melted$cellType=="iPSCCM"),]) + geom_point(shape = 21, aes(x =indiv, y = abs(alpaca_score), col = cellType, fill = cellType, alpha = 0.1),) + theme_classic()#+ scale_color_manual(values=pallet)+scale_fill_manual(values=pallet) + xlab("Individual") #+ theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())  + labs(y = "-log10(p-value)", title = "Enrichment of disrupted TFs in CAD genes",color = "Cell type") + annotate("text", x = 110, y = 1.4, label = "p = 0.05")
 #dev.off()
@@ -201,14 +233,66 @@ ggplot(cads_melted[which(cads_melted$cellType=="iPSCCM"),]) + geom_point(shape =
 
 
 ```{r}
-high_score_nodes_cad <- unique(cads_melted[which((abs(cads_melted$alpaca_score) > 0.3) & (cads_melted$cellType == "iPSCCM")),'node'])
+high_score_nodes_cad <- unique(cads_melted[which(((cads_melted$alpaca_score) > 2) & (cads_melted$cellType == "iPSCCM")),'node'])
 cads <- merged_alpaca_table_scaled[which(merged_alpaca_table_scaled$node %in% high_score_nodes_cad),c(1:358)]
 cads_melted <- melt(cads)
 colnames(cads_melted) <- c("node","sample","alpaca_score")
 cads_melted <- separate(cads_melted, sample, c("cellType","tag", "indiv"), "_", remove = TRUE)
 
-ggplot(cads_melted) + geom_point(aes(x = reorder(indiv, -alpaca_score), y = abs(alpaca_score), col = cellType, fill = cellType, alpha = 0.1, shape = node)) + theme_classic()+ scale_color_manual(values=pallet) +scale_fill_manual(values=pallet) + xlab("Individual")
+p1 <- ggplot(cads_melted) + geom_point(size = 2,alpha = 0.4,aes(x = reorder(indiv, -alpaca_score), y = (alpaca_score), col = cellType,  shape = node)) + theme_classic()+ scale_color_manual(values=pallet)  + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())+ labs(y = "ALPACA score",col = "Cell type",shape = "TF", x= "Individual") 
+
+p2 <- annotate_figure(p1,top = text_grob("ALPACA scores for top CAD genes in iPSC-CMs", color = "black", face = "bold", size = 14))
+pdf("banovich_topCAD_ipsc.pdf",width = 5, height = 3.5)
+plot(p2)
+dev.off()
+
+plot(p2)
 ```
+
+# check gene disruption scores
+```{r}
+load ("../scripts/gene_degrees_hard_thresh_035.RData")
+high_score_nodes_cad
+disruptions <- melt(gene_degrees[which(gene_degrees$gene == "ENSG00000070366"),c(1,c(3:121),c(123:241),c(243:361))])
+colnames(disruptions) <- c("node","sample","ds")
+disruptions <- separate(disruptions, sample, c("cellType","tag", "indiv"), "_", remove = TRUE)
+ggplot(disruptions) + geom_point(aes(x = indiv, y = ds, col = cellType, fill = cellType, alpha = 0.1)) + theme_classic()+ scale_color_manual(values=pallet) +scale_fill_manual(values=pallet) + xlab("Individual")
+```
+
+
+```{r}
+only_CD_genes <- as.vector(CD$gene)[which(!((as.vector(CD$gene) %in% as.vector(CAD$gene))))]
+cds <- merged_alpaca_table_scaled[which(merged_alpaca_table_scaled$node %in% CD$gene),c(1:358)]
+cds_melted <- melt(cds)
+colnames(cds_melted) <- c("node","sample","alpaca_score")
+cds_melted <- separate(cds_melted, sample, c("cellType","tag", "indiv"), "_", remove = TRUE)
+
+ggplot(cds_melted) + geom_point(shape = 21, aes(x =indiv, y = abs(alpaca_score), col = cellType, fill = cellType, alpha = 0.1)) + theme_classic()+ scale_color_manual(values=pallet)+scale_fill_manual(values=pallet) + xlab("Individual")
+
+ggplot(cds_melted[which(cds_melted$cellType=="iPSCCM"),]) + geom_point(shape = 21, aes(x =indiv, y = abs(alpaca_score), col = cellType, fill = cellType, alpha = 0.1),) + theme_classic()#+ scale_color_manual(values=pallet)+scale_fill_manual(values=pallet) + xlab("Individual") #+ theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())  + labs(y = "-log10(p-value)", title = "Enrichment of disrupted TFs in CAD genes",color = "Cell type") + annotate("text", x = 110, y = 1.4, label = "p = 0.05")
+#dev.off()
+```
+
+
+```{r}
+high_score_nodes_cd <- unique(cds_melted[which((abs(cds_melted$alpaca_score) > 2) & (cds_melted$cellType == "LCL")),'node'])
+cds <- merged_alpaca_table_scaled[which(merged_alpaca_table_scaled$node %in% high_score_nodes_cd),c(1:358)]
+cds_melted <- melt(cds)
+colnames(cds_melted) <- c("node","sample","alpaca_score")
+cds_melted <- separate(cds_melted, sample, c("cellType","tag", "indiv"), "_", remove = TRUE)
+
+p1 <- ggplot(cds_melted) + geom_point(size = 2,alpha = 0.4,aes(x = reorder(indiv, -alpaca_score), y = (alpaca_score), col = cellType,  shape = node)) + theme_classic()+ xlab("Individual")+ theme_classic()+ scale_color_manual(values=pallet)  + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())+ labs(y = "ALPACA score",color = "Cell type",shape = "TF", x= "Individual")
+p2 <- annotate_figure(p1,top = text_grob("ALPACA scores for top CD genes in LCLs", color = "black", face = "bold", size = 14))
+pdf("banovich_topCD_lcl.pdf",width = 5, height = 3.5)
+plot(p2)
+dev.off()
+plot(p2)
+
+```
+
+
+
+
 ggplot(cads_melted, aes(y = abs(alpaca_score), x = cellType, fill = cellType)) + geom_boxplot() +  geom_jitter()+ theme_classic()+ scale_color_manual(values=pallet) +scale_fill_manual(values=pallet)
 
 

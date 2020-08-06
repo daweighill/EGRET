@@ -25,13 +25,11 @@ load("../outputs/finalEgret_v1_banovich_LCL_allModels_smart1_07032020_1_panda.RD
 net <- melt(regnet)
 colnames(net) = c("tf","gene","score")
 net$id <- paste0(net$tf,net$gene)
-
 regnet_edge_table_LCL <- data.frame(net$id)
 colnames(regnet_edge_table_LCL) <- c("id")
 regnet_edge_table_LCL$tf <- as.vector(net$tf)
 regnet_edge_table_LCL$gene <- as.vector(net$gene)
 regnet_edge_table_LCL$panda <- as.vector(net$score)
-
 for (g in c(1:119)) {
   filename <- paste0("../outputs/finalEgret_v1_banovich_LCL_allModels_smart1_07032020_",g,"_egret.RData")
   load(filename)
@@ -55,7 +53,6 @@ load("../outputs/finalEgret_v1_banovich_iPSC_allModels_smart1_07032020_1_panda.R
 net <- melt(regnet)
 colnames(net) = c("tf","gene","score")
 net$id <- paste0(net$tf,net$gene)
-
 regnet_edge_table_iPSC <- data.frame(net$id)
 colnames(regnet_edge_table_iPSC) <- c("id")
 regnet_edge_table_iPSC$tf <- as.vector(net$tf)
@@ -83,13 +80,11 @@ load("../outputs/finalEgret_v1_banovich_iPSC-CM_allModels_smart1_07032020_1_pand
 net <- melt(regnet)
 colnames(net) = c("tf","gene","score")
 net$id <- paste0(net$tf,net$gene)
-
 regnet_edge_table_iPSC_CM <- data.frame(net$id)
 colnames(regnet_edge_table_iPSC_CM) <- c("id")
 regnet_edge_table_iPSC_CM$tf <- as.vector(net$tf)
 regnet_edge_table_iPSC_CM$gene <- as.vector(net$gene)
 regnet_edge_table_iPSC_CM$panda <- as.vector(net$score)
-
 for (g in c(1:119)) {
   filename <- paste0("../outputs/finalEgret_v1_banovich_iPSC-CM_allModels_smart1_07032020_",g,"_egret.RData")
   load(filename)
@@ -114,7 +109,6 @@ This ensures that we are considering the same set of edges for the two tissues (
 #load("../outputs/LCL_table_banovich_finalEgret_v1_06292020.RData")
 #load("../outputs/iPSC_table_banovich_finalEgret_v1_allModels_smart1_07042020.RData")
 #load("../outputs/iPSC-CM_table_banovich_finalEgret_v1_allModels_smart1_07042020.RData")
-
 pre_merged_regnet_table <- merge(regnet_edge_table_LCL,regnet_edge_table_iPSC, by.x = c(1,2,3), by.y = c(1,2,3), all = FALSE)
 merged_regnet_table <- merge(pre_merged_regnet_table,regnet_edge_table_iPSC_CM,by.x = c(1,2,3), by.y = c(1,2,3), all = FALSE)
 colnames(merged_regnet_table)[4] <- "LCL_panda"
@@ -136,7 +130,6 @@ for (i in c(1:119)){
   diff_table[,124+i] <- abs(merged_regnet_table[,124+i]-merged_regnet_table[,124])
   diff_table[,244+i] <- abs(merged_regnet_table[,244+i]-merged_regnet_table[,244])
 }
-
 save(diff_table, file = "../outputs/diffTable_merged_LCL_iPSC_iPSC-CM_banovich_edge_table_allModels_smart1_07032020.RData")
 load("../outputs/diffTable_merged_LCL_iPSC_iPSC-CM_banovich_edge_table_allModels_smart1_07032020.RData")
 ```
@@ -164,7 +157,6 @@ tf_degree_iPSC_CM$tissue <- "iPSC-CM"
 tf_degrees_melted <- rbind(tf_degree_lcl,tf_degree_iPSC,tf_degree_iPSC_CM)
 colnames(tf_degrees_melted) <- c("tf","individual","diff_out_degree","tissue")
 ggplot(tf_degrees_melted, aes(x=tissue, y=diff_out_degree, color=tissue)) + geom_violin()
-
 ```
 
 ```{r}
@@ -178,7 +170,6 @@ gene_degree_iPSC_CM$tissue <- "iPSC-CM"
 gene_degrees_melted <- rbind(gene_degree_lcl,gene_degree_iPSC,gene_degree_iPSC_CM)
 colnames(gene_degrees_melted) <- c("gene","individual","diff_in_degree","tissue")
 ggplot(gene_degrees_melted, aes(x=tissue, y=diff_in_degree, color=tissue)) + geom_violin()
-
 ```
 
 ## Which TFs are most impacted by variants per individual, per tissue
@@ -211,7 +202,6 @@ dim(indicence_high_impact_tfs_tissue_specific)
 dim(indicence_high_impact_tfs)
 colnames(indicence_high_impact_tfs_tissue_specific) <- colnames(indicence_high_impact_tfs)
 ggplot(indicence_high_impact_tfs_tissue_specific, aes(x=tf, y=n, fill = tissue)) + geom_bar(position="dodge", stat="identity")
-
 ```
 
 
@@ -231,15 +221,10 @@ wget https://www.ebi.ac.uk/gwas/api/search/downloads/full
 
 ```{r}
 system("perl /home/ubuntu/EGRET/final_egret_v1_banovich/scripts/parse_GWAS_associations.pl /home/ubuntu/EGRET/final_egret_v1_banovich/gwas/gwas_catalog 'Coronary artery disease' /home/ubuntu/EGRET/final_egret_v1_banovich/gwas/CAD_gwas_parsed.txt")
-
 system("perl /home/ubuntu/EGRET/final_egret_v1_banovich/scripts/parse_GWAS_associations.pl /home/ubuntu/EGRET/final_egret_v1_banovich/gwas/gwas_catalog 'Rheumatoid arthritis' /home/ubuntu/EGRET/final_egret_v1_banovich/gwas/RA_gwas_parsed.txt")
-
 system("perl /home/ubuntu/EGRET/final_egret_v1_banovich/scripts/parse_GWAS_associations.pl /home/ubuntu/EGRET/final_egret_v1_banovich/gwas/gwas_catalog 'Body mass index' /home/ubuntu/EGRET/final_egret_v1_banovich/gwas/BMI_gwas_parsed.txt")
-
 system("perl /home/ubuntu/EGRET/final_egret_v1_banovich/scripts/parse_GWAS_associations.pl /home/ubuntu/EGRET/final_egret_v1_banovich/gwas/gwas_catalog 'Myocardial infarction' /home/ubuntu/EGRET/final_egret_v1_banovich/gwas/MI_gwas_parsed.txt")
-
 system("perl /home/ubuntu/EGRET/final_egret_v1_banovich/scripts/parse_GWAS_associations.pl /home/ubuntu/EGRET/final_egret_v1_banovich/gwas/gwas_catalog 'Multiple sclerosis' /home/ubuntu/EGRET/final_egret_v1_banovich/gwas/MS_gwas_parsed.txt")
-
 term <- "\"Crohn's disease\""
 command <- paste0("perl /home/ubuntu/EGRET/final_egret_v1_banovich/scripts/parse_GWAS_associations.pl /home/ubuntu/EGRET/final_egret_v1_banovich/gwas/gwas_catalog ",term," /home/ubuntu/EGRET/final_egret_v1_banovich/gwas/CD_gwas_parsed.txt")
 system(command)
@@ -251,27 +236,21 @@ Now load the gwas results each into a data frame
 # load gene annotation to assign gene id to gene name
 nameGeneMap <- read.table("../../final_egret_v1/annotation/geneID_name_map.txt", header = FALSE)
 colnames(nameGeneMap) <- c("gene","name")
-
 RA <- read.table("../gwas/RA_gwas_parsed.txt", header = FALSE,  sep = "\t")
 colnames(RA) <- c("RAtrait","name")
 RA$gene <- nameGeneMap$gene[match(RA$name, nameGeneMap$name)]
-
 CD <- read.table("../gwas/CD_gwas_parsed.txt", header = FALSE,  sep = "\t")
 colnames(CD) <- c("CDtrait","name")
 CD$gene <- nameGeneMap$gene[match(CD$name, nameGeneMap$name)]
-
 CAD <- read.table("../gwas/CAD_gwas_parsed.txt", header = FALSE,  sep = "\t")
 colnames(CAD) <- c("CADtrait","name")
 CAD$gene <- nameGeneMap$gene[match(CAD$name, nameGeneMap$name)]
-
 BMI <- read.table("../gwas/BMI_gwas_parsed.txt", header = FALSE,  sep = "\t")
 colnames(BMI) <- c("BMItrait","name")
 BMI$gene <- nameGeneMap$gene[match(BMI$name, nameGeneMap$name)]
-
 MS <- read.table("../gwas/MS_gwas_parsed.txt", header = FALSE,  sep = "\t")
 colnames(MS) <- c("MStrait","name")
 MS$gene <- nameGeneMap$gene[match(MS$name, nameGeneMap$name)]
-
 MI <- read.table("../gwas/MI_gwas_parsed.txt", header = FALSE,  sep = "\t")
 colnames(MI) <- c("MItrait","name")
 MI$gene <- nameGeneMap$gene[match(MI$name, nameGeneMap$name)]
@@ -281,22 +260,15 @@ Now load the difference table we made before, and merge in the GWAS traits
 ```{r}
 diff_table$GWAS_RA_tf <- ifelse(diff_table$tf %in% RA$name, 1, 0)
 diff_table$GWAS_RA_gene <- ifelse(diff_table$gene %in% RA$gene, 1, 0)
-
 diff_table$GWAS_CD_tf <- ifelse(diff_table$tf %in% CD$name, 1, 0)
 diff_table$GWAS_CD_gene <- ifelse(diff_table$gene %in% CD$gene, 1, 0)
-
 diff_table$GWAS_CAD_tf <- ifelse(diff_table$tf %in% CAD$name, 1, 0)
 diff_table$GWAS_CAD_gene <- ifelse(diff_table$gene %in% CAD$gene, 1, 0)
-
 diff_table$GWAS_BMI_tf <- ifelse(diff_table$tf %in% BMI$name, 1, 0)
 diff_table$GWAS_BMI_gene <- ifelse(diff_table$gene %in% BMI$gene, 1, 0)
-
 diff_table$GWAS_MS_tf <- ifelse(diff_table$tf %in% MS$name, 1, 0)
 diff_table$GWAS_MS_gene <- ifelse(diff_table$gene %in% MS$gene, 1, 0)
-
 diff_table$GWAS_MI_tf <- ifelse(diff_table$tf %in% MI$name, 1, 0)
 diff_table$GWAS_MI_gene <- ifelse(diff_table$gene %in% MI$gene, 1, 0)
-
 save(diff_table, file = "../outputs/diff_table_with_gwas_banovich_allModels_smart1_07042020.RData")
 ```
-

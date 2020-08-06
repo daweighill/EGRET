@@ -1,0 +1,233 @@
+---
+title: "Final EGRET v1 Banovich application - Data Analysis"
+author: "Deborah Weighill"
+date: "August 4, 2020"
+output:
+  html_notebook:
+    toc: true
+    theme: cosmo
+    df_print: paged
+---
+
+
+
+# Load libraries
+```{r}
+library(dplyr)
+library(preprocessCore)
+library(ggplot2)
+library(tidyr)
+library(ggpubr)
+library(reshape2)
+library(jcolors)
+library(ALPACA)
+library(gridExtra)
+library(grid)
+library(gridExtra)
+pallet <- c(    "#FFBF00",  "#870E75"  ,  "#0BB19F" )
+```
+
+# Make EGRET edge table
+
+Load all of the EGRET regnets and merge into a single table.
+
+
+## Load the LCL results
+```{r echo=FALSE,results='hide'}
+load("../outputs/finalEgret_v1_banovich_LCL_allModels_smart1_07032020_1_egret.RData")
+net <- melt(regnet)
+colnames(net) = c("tf","gene","score")
+net$id <- paste0(net$tf,net$gene)
+regnet_edge_table_LCL <- data.frame(net$id)
+colnames(regnet_edge_table_LCL) <- c("id")
+regnet_edge_table_LCL$tf <- as.vector(net$tf)
+regnet_edge_table_LCL$gene <- as.vector(net$gene)
+regnet_edge_table_LCL$panda <- as.vector(net$score)
+for (g in c(2:119)) {
+  filename <- paste0("../outputs/finalEgret_v1_banovich_LCL_allModels_smart1_07032020_",g,"_egret.RData")
+  load(filename)
+  net <- melt(regnet)
+  colnames(net) = c("tf","gene","score")
+  net$id <- paste0(net$tf,net$gene)
+  if(all.equal(as.vector(regnet_edge_table_LCL$id),as.vector(net$id))){
+    print(g)
+    regnet_edge_table_LCL$tempID <- as.vector(net$score)
+    #print(colnames(regnet_edge_table))
+    colnames(regnet_edge_table_LCL)[colnames(regnet_edge_table_LCL) == "tempID"] <- paste0("LCL_indiv_",g)
+  }
+}
+save(regnet_edge_table_LCL, file = "../outputs/LCL_egret_edge_table_smart1_08042020.RData")
+```
+
+
+## Load the iPSC results
+```{r echo=FALSE,results='hide'}
+load("../outputs/finalEgret_v1_banovich_iPSC_allModels_smart1_07032020_1_egret.RData")
+net <- melt(regnet)
+colnames(net) = c("tf","gene","score")
+net$id <- paste0(net$tf,net$gene)
+regnet_edge_table_iPSC <- data.frame(net$id)
+colnames(regnet_edge_table_iPSC) <- c("id")
+regnet_edge_table_iPSC$tf <- as.vector(net$tf)
+regnet_edge_table_iPSC$gene <- as.vector(net$gene)
+regnet_edge_table_iPSC$panda <- as.vector(net$score)
+for (g in c(2:119)) {
+  filename <- paste0("../outputs/finalEgret_v1_banovich_iPSC_allModels_smart1_07032020_",g,"_egret.RData")
+  load(filename)
+  net <- melt(regnet)
+  colnames(net) = c("tf","gene","score")
+  net$id <- paste0(net$tf,net$gene)
+  if(all.equal(as.vector(regnet_edge_table_iPSC$id),as.vector(net$id))){
+    print(g)
+    regnet_edge_table_iPSC$tempID <- as.vector(net$score)
+    #print(colnames(regnet_edge_table))
+    colnames(regnet_edge_table_iPSC)[colnames(regnet_edge_table_iPSC) == "tempID"] <- paste0("iPSC_indiv_",g)
+  }
+}
+save(regnet_edge_table_iPSC, file = "../outputs/iPSC_egret_edge_table_smart1_08042020.RData")
+```
+
+## Load the iPSC-CM results
+```{r echo=FALSE,results='hide'}
+load("../outputs/finalEgret_v1_banovich_iPSC-CM_allModels_smart1_07032020_1_egret.RData")
+net <- melt(regnet)
+colnames(net) = c("tf","gene","score")
+net$id <- paste0(net$tf,net$gene)
+regnet_edge_table_iPSC_CM <- data.frame(net$id)
+colnames(regnet_edge_table_iPSC_CM) <- c("id")
+regnet_edge_table_iPSC_CM$tf <- as.vector(net$tf)
+regnet_edge_table_iPSC_CM$gene <- as.vector(net$gene)
+regnet_edge_table_iPSC_CM$panda <- as.vector(net$score)
+for (g in c(2:119)) {
+  filename <- paste0("../outputs/finalEgret_v1_banovich_iPSC-CM_allModels_smart1_07032020_",g,"_egret.RData")
+  load(filename)
+  net <- melt(regnet)
+  colnames(net) = c("tf","gene","score")
+  net$id <- paste0(net$tf,net$gene)
+  if(all.equal(as.vector(regnet_edge_table_iPSC_CM$id),as.vector(net$id))){
+    print(g)
+    regnet_edge_table_iPSC_CM$tempID <- as.vector(net$score)
+    #print(colnames(regnet_edge_table))
+    colnames(regnet_edge_table_iPSC_CM)[colnames(regnet_edge_table_iPSC_CM) == "tempID"] <- paste0("iPSC-CM_indiv_",g)
+  }
+}
+save(regnet_edge_table_iPSC_CM, file = "../outputs/iPSC-CM_egret_edge_table_smart1_08042020.RData")
+```
+
+
+## Merge into a single table with an inner join
+
+
+```{r}
+pre_merged_regnet_table <- merge(regnet_edge_table_LCL,regnet_edge_table_iPSC, by.x = c(1,2,3), by.y = c(1,2,3), all = FALSE)
+merged_regnet_table <- merge(pre_merged_regnet_table,regnet_edge_table_iPSC_CM,by.x = c(1,2,3), by.y = c(1,2,3), all = FALSE)s
+save(merged_regnet_table, file = "../outputs/allTissues_merged_egret_edge_table_smart1_08042020.RData")
+```
+
+
+
+# scale
+
+```{r}
+colnames(merged_regnet_table)[4] <- "LCL_indiv_1"
+colnames(merged_regnet_table)[123] <- "iPSC_indiv_1"
+colnames(merged_regnet_table)[242] <- "iPSC-CM_indiv_1"
+
+merged_regnet_table_qq <- cbind(merged_regnet_table[,c(1,2,3)],as.data.frame(normalize.quantiles(as.matrix(merged_regnet_table[,c(4:360)]))))
+colnames(merged_regnet_table_qq) <- colnames(merged_regnet_table)
+
+merged_regnet_table_scaled <- cbind(merged_regnet_table[,c(1,2,3)],scale(merged_regnet_table[,c(4:360)], center = TRUE, scale = TRUE))
+colnames(merged_regnet_table_scaled) <- colnames(merged_regnet_table)
+
+```
+
+
+
+
+## gene degrees
+
+
+```{r}
+gene_degrees_from_unscaled <- aggregate(merged_regnet_table[,c(4:360)], by = list(merged_regnet_table$gene), FUN = sum) 
+gene_degrees_from_scaled <- aggregate(merged_regnet_table_scaled[,c(4:360)], by = list(merged_regnet_table_scaled$gene), FUN = sum) 
+
+gene_degrees_from_qq <- aggregate(merged_regnet_table_scaled[,c(4:360)], by = list(merged_regnet_table_scaled$gene), FUN = sum)
+
+
+save(gene_degrees_from_unscaled, file = "../outputs/gene_degrees_from_unscaled.RData")
+save(gene_degrees_from_scaled, file = "../outputs/gene_degrees_from_scaled.RData")
+save(gene_degrees_from_qq, file = "../outputs/gene_degrees_from_qq.RData")
+load("../outputs/gene_degrees_from_scaled.RData")
+load("../outputs/gene_degrees_from_unscaled.RData")
+load("../outputs/gene_degrees_from_qq.RData")
+```
+
+## tf degrees
+
+
+```{r}
+tf_degrees_from_unscaled <- aggregate(merged_regnet_table[,c(4:360)], by = list(merged_regnet_table$tf), FUN = sum) 
+
+tf_degrees_from_scaled <- aggregate(merged_regnet_table_scaled[,c(4:360)], by = list(merged_regnet_table_scaled$tf), FUN = sum) 
+
+tf_degrees_from_qq <- aggregate(merged_regnet_table_scaled[,c(4:360)], by = list(merged_regnet_table_scaled$tf), FUN = sum)
+
+
+save(tf_degrees_from_unscaled, file = "../outputs/tf_degrees_from_unscaled.RData")
+save(tf_degrees_from_scaled, file = "../outputs/tf_degrees_from_scaled.RData")
+save(tf_degrees_from_qq, file = "../outputs/tf_degrees_from_qq.RData")
+
+
+```
+
+```{r}
+gene_degrees_from_unscaled__scaled <- cbind(gene_degrees_from_unscaled[,c(1)],as.data.frame(scale(gene_degrees_from_unscaled[,c(2:358)], center = TRUE, scale = TRUE)))
+colnames(gene_degrees_from_unscaled__scaled) <- colnames(gene_degrees_from_unscaled)
+
+
+gene_degrees_from_unscaled__qq <- cbind(gene_degrees_from_unscaled[,c(1)],as.data.frame(normalize.quantiles(as.matrix(gene_degrees_from_unscaled[,c(2:358)]))))
+colnames(gene_degrees_from_unscaled__qq) <- colnames(gene_degrees_from_unscaled)
+```
+
+plot distribution
+```{r}
+gene_degrees <- gene_degrees_from_unscaled__scaled
+colnames(gene_degrees)[1] <- "gene"
+gene_degree_lcl <- melt(gene_degrees[,c(1,c(2:120))], id.vars = c("gene"))
+gene_degree_lcl$tissue <- "LCL"
+gene_degree_iPSC <- melt(gene_degrees[,c(1,c(121:239))], id.vars = c("gene"))
+gene_degree_iPSC$tissue <- "iPSC"
+gene_degree_iPSC_CM <- melt(gene_degrees[,c(1,c(240:358))], id.vars = c("gene"))
+gene_degree_iPSC_CM$tissue <- "iPSC-CM"
+gene_degrees_melted <- rbind(gene_degree_lcl,gene_degree_iPSC,gene_degree_iPSC_CM)
+colnames(gene_degrees_melted) <- c("gene","individual","diff_in_degree","tissue")
+ggplot(gene_degrees_melted, aes(x=tissue, y=diff_in_degree, color=tissue, fill = tissue)) + geom_violin() + theme_bw() + scale_fill_manual(values=pallet) + scale_color_manual(values=pallet) + labs(x ="Cell type", y = "Gene degree") + theme(legend.position="none")
+```
+
+# differential gene degrees between tissues
+```{r}
+gene_degrees <- gene_degrees_from_unscaled__scaled
+colnames(gene_degrees)[1] <- "gene"
+genes <- c(1:length(as.vector(gene_degrees$gene)))
+
+lcl_vs_cm <- as.vector(sapply(genes, FUN = function(x){
+  diff_av <- mean(as.numeric(gene_degrees[x,c(121:239)])) - mean(as.numeric(gene_degrees[x,c(240:358)]))
+  return(diff_av)
+}))
+names(lcl_vs_cm) <- (gene_degrees$gene)
+```
+
+```{r}
+write.table(names(lcl_vs_cm)[order((as.numeric(as.vector(lcl_vs_cm))))],file = "../outputs/gene_diff_degree_lcl_vs_cm_highCM", sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+
+
+write.table(names(lcl_vs_cm)[order(-(as.numeric(as.vector(lcl_vs_cm))))],file = "../outputs/gene_diff_degree_lcl_vs_cm_highLCL", sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+
+write.table(names(lcl_vs_cm)[order(-(abs(as.numeric(as.vector(lcl_vs_cm)))))],file = "../outputs/gene_diff_degree_lcl_vs_cm_abs", sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+```
+
+
+
+
+
+
