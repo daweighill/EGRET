@@ -73,6 +73,7 @@ for (p in c(1:1)) {
 }
 filename <- paste0("../outputs/edge_table_gm12878_08052020.RData")
 save(regnet_edge_table_gm12878, file = filename)
+
 ```
 
 ## Load ChIP-seq data for GM12878
@@ -100,13 +101,13 @@ We now filter down the panda/egret networks to only include those TFs which are 
 ```{r echo=FALSE,results='hide'}
 filtered_net_table_gm12878 <- regnet_edge_table_gm12878[(regnet_edge_table_gm12878$tf %in% chipseq_regnet_gm12878$tf) ,]
 filtered_net_table_gm12878$chipseq <- ifelse(filtered_net_table_gm12878$id %in% chipseq_regnet_gm12878$id,1,0)
-
 filtered_net_table_gm12878$diff_egret <- abs(filtered_net_table_gm12878$egret_GM12878 - filtered_net_table_gm12878$panda)
-
 validation_table_gm12878 <- filtered_net_table_gm12878
 filename <- paste0("../outputs/validation_table_gm12878_08052020.RData")
 save(validation_table_gm12878, file = filename)
+load("../outputs/validation_table_gm12878_08052020.RData")
 ```
+
 
 # Create validation table for K562 - "human only version"
 
@@ -170,10 +171,10 @@ We now filter down the panda/egret networks to only include those TFs which are 
 filtered_net_table_k562 <- regnet_edge_table_k562[(regnet_edge_table_k562$tf %in% chipseq_regnet_k562$tf) ,]
 filtered_net_table_k562$chipseq <- ifelse(filtered_net_table_k562$id %in% chipseq_regnet_k562$id,1,0)
 filtered_net_table_k562$diff_egret <- abs(filtered_net_table_k562$egret_k562 - filtered_net_table_k562$panda)
-
 validation_table_k562 <- filtered_net_table_k562
 filename <- paste0("../outputs/validation_table_k562_08052020.RData")
 save(validation_table_k562, file = filename)
+load("../outputs/validation_table_k562_08052020.RData")
 ```
 
 
@@ -289,6 +290,27 @@ egret_auc_pvals_table$pvalue <- signif(as.numeric(egret_auc_pvals_topn$pval), di
 print(xtable(egret_auc_pvals_table, type = "latex", digits = 5), file= "../tables/pval_table_allHumanModels_topn_k562.tex",include.rownames=FALSE)
 ```
 
+Make a bar plot
+
+```{r}
+auc_improvement_table <- data.frame()
+
+edited_edges_k562 <- read.table("../outputs/edge_modifications_finalEgret_v1_k562_eQTL_06182020.txt")
+colnames(edited_edges_k562) <- c("tf","gene","id","mod")
+edited_subset <- validation_table_k562[which(validation_table_k562$id %in% edited_edges_k562$id),]
+
+rocP <- roc(edited_subset$chipseq, edited_subset$panda, auc = TRUE, direction = "<")
+rocE <- roc(edited_subset$chipseq, edited_subset$egret_k562,auc = TRUE, direction = "<")
+test <- roc.test(rocP, rocE, alternative = "less", method = "delong" )
+pandaAUC <- test$estimate["AUC of roc1"]
+egretAUC <- test$estimate["AUC of roc2"]
+pval <- test$p.value
+print(paste(pandaAUC,egretAUC,pval))
+ 
+auc_improvement_table <- as.data.frame(t(c("K562",((egretAUC-pandaAUC)/pandaAUC)*100,pval)))
+
+```
+
 
 ## GM12878 performance by edge disruption threshold
 ```{r,results='hide',fig.show=TRUE}
@@ -399,6 +421,30 @@ egret_auc_pvals_table$pvalue <- signif(as.numeric(egret_auc_pvals_topn$pval), di
 print(xtable(egret_auc_pvals_table, type = "latex", digits = 5), file = "../tables/pval_table_allHumanModels_topn_gm12878.tex",include.rownames=FALSE,)
 ```
 
+```{r}
+edited_edges_gm12878 <- read.table("../outputs/edge_modifications_EGRET_na12878_08142020.txt")
+colnames(edited_edges_gm12878) <- c("tf","gene","id","mod")
+edited_subset_g <- validation_table_gm12878[which(validation_table_gm12878$id %in% edited_edges_gm12878$id),]
+
+rocP <- roc(edited_subset_g$chipseq, edited_subset_g$panda, auc = TRUE, direction = "<")
+rocE <- roc(edited_subset_g$chipseq, edited_subset_g$egret_GM12878,auc = TRUE, direction = "<")
+test <- roc.test(rocP, rocE, alternative = "less", method = "delong" )
+pandaAUC <- test$estimate["AUC of roc1"]
+egretAUC <- test$estimate["AUC of roc2"]
+pval <- test$p.value
+print(paste(pandaAUC,egretAUC,pval))
+  
+auc_improvement_table <- rbind(auc_improvement_table,(t(c("GM12878",((egretAUC-pandaAUC)/pandaAUC)*100,pval))))
+colnames(auc_improvement_table) <- c("Genotype","AUC_Improvement","pvalue")
+auc_improvement_table$p_round <- paste0("Delong p = ",signif(as.numeric(as.vector(auc_improvement_table$pvalue)), digits = 5))
+
+p <- ggplot(auc_improvement_table, aes(x=Genotype, y=as.numeric(as.vector((AUC_Improvement))), fill = Genotype, group = Genotype)) +geom_bar(stat="identity")  +theme_bw() +  scale_fill_manual(values=pallet) + ylim(0,95)+ labs(x ="Genotype", y = "AU-ROC percentage imprvement")  + theme(legend.position="none")  + geom_text(aes(label=c(" ","*")), position=position_dodge(width=0.9), vjust=-0.6)
+
+pdf("../figures/auc_improvement_human.pdf",width = 3.5, height = 3.5)
+plot(p)
+dev.off()
+```
+
 # Select examples for visualizing in genome browser
 
 ```{r}
@@ -415,13 +461,13 @@ Make a box plot showing the distribution in egret edge weights for top diff edge
 
 
 ```{r}
-topn_gm12878 <- top_n(validation_table_gm12878, 35, diff_gm12878)
+topn_gm12878 <- top_n(validation_table_gm12878, 48, diff_gm12878)
 test <- t.test(topn_gm12878[which(topn_gm12878$chipseq_gm12878 == 0),]$diff_gm12878,topn_gm12878[which(topn_gm12878$chipseq_gm12878 == 1),]$diff_gm12878, alternative="greater")
 
 
 p1 <- ggplot(topn_gm12878, aes(x = as.factor(chipseq_gm12878), y = diff_gm12878, color = as.factor(chipseq_gm12878), group = as.factor(chipseq_gm12878)))+ geom_boxplot() + geom_jitter(position=position_jitter(0.1))+  stat_summary(fun.y=mean, geom="point", shape=18,size=5, color="#E41A1C") + theme_bw() + scale_color_manual(values=pallet)  + theme(legend.position="right") + labs(title="GM12878", x ="ChIP-seq binding", y = "Edge disruption score", color  = "ChIP-seq binding") + annotate("text", x = 1.6, y = 7.5, label = paste0("t-test p= ",signif(test$p.value,4)))
 
-topn_k562 <- top_n(validation_table_k562, 35, diff_k562)
+topn_k562 <- top_n(validation_table_k562, 48, diff_k562)
 
 test <- t.test(topn_k562[which(topn_k562$chipseq_k562 == 0),]$diff_k562,topn_k562[which(topn_k562$chipseq_k562 == 1),]$diff_k562, alternative="greater")
 
@@ -435,6 +481,29 @@ pdf("../figures/top35_diffvalues_boxplots_k562_gm12878.pdf",width = 6, height = 
 plot(p4)
 dev.off()
 plot(p4)
+```
+
+```{r}
+topn_gm12878 <- top_n(validation_table_gm12878, 48, diff_gm12878)
+test <- t.test(topn_gm12878[which(topn_gm12878$chipseq_gm12878 == 0),]$egret_gm12878,topn_gm12878[which(topn_gm12878$chipseq_gm12878 == 1),]$egret_gm12878  , alternative="less")
+
+
+p1 <- ggplot(topn_gm12878, aes(x = as.factor(chipseq_gm12878), y = egret_gm12878, color = as.factor(chipseq_gm12878), group = as.factor(chipseq_gm12878)))+ geom_boxplot() + geom_jitter(position=position_jitter(0.1))+  stat_summary(fun.y=mean, geom="point", shape=18,size=5, color="#E41A1C") + theme_bw() + scale_color_manual(values=pallet)  + theme(legend.position="right") + labs(title="GM12878", x ="ChIP-seq binding", y = "Edge disruption score", color  = "ChIP-seq binding") + annotate("text", x = 1.6, y = 7.5, label = paste0("t-test p= ",signif(test$p.value,4)))
+
+topn_k562 <- top_n(validation_table_k562, 48, diff_k562)
+
+test <- t.test(topn_k562[which(topn_k562$chipseq_k562 == 0),]$egret_k562,topn_k562[which(topn_k562$chipseq_k562 == 1),]$egret_k562, alternative="less")
+
+
+p2 <- ggplot(topn_k562, aes(x = as.factor(chipseq_k562), y = egret_k562, color = as.factor(chipseq_k562), group = as.factor(chipseq_k562)))+ geom_boxplot() + geom_jitter(position=position_jitter(0.1))+  stat_summary(fun.y=mean, geom="point", shape=18,size=5, color="#E41A1C") + theme_bw() + scale_color_manual(values=pallet)  + theme(legend.position="right") + labs(title="K562", x ="ChIP-seq binding", y = "Edge disruption score", color  = "ChIP-seq binding") + annotate("text", x = 1.7, y = 10, label = paste0("t-test p= ",signif(test$p.value,4)))
+
+p3 <- grid.arrange(p1 + theme(legend.position="none"), p2 + theme(legend.position="right"), nrow=1, widths = c(3.5,5.9))
+p4 <- annotate_figure(p3,top = text_grob("Top 35 edge disruption scores", color = "black", face = "bold", size = 14))
+
+#pdf("../figures/top35_diffvalues_boxplots_k562_gm12878.pdf",width = 6, height = 3.5)
+plot(p4)
+#dev.off()
+#plot(p4)
 ```
 
 
@@ -545,13 +614,89 @@ dev.off()
 
 # Now show that difference scores are predictive of disruption with AUCs
 ```{r}
+colnames(validation_table_gm12878) <- c("id","tf","gene","panda","egret_gm12878","chipseq_gm12878","diff_gm12878")
+get_roc_for_top_x <- function(egretNum, x) {
+  
+  top_x_table_gm12878 <- top_n(validation_table_gm12878, x, diff_gm12878)
+  top_x_table_gm12878$disrupt <- 1 - top_x_table_gm12878$chipseq
+  curve <- evalmod(scores = top_x_table_gm12878$diff_gm12878, labels = top_x_table_gm12878$disrupt, posclass = 1)
+  aucs <- precrec::auc(curve)
+  autoplot(curve)
+  auc_gm12878 <- round(aucs$aucs[1], digits=4)
+  prc_gm12878 <- round(aucs$aucs[2], digits=4)
+  nn <- attr(curve$rocs,"data_info")$nn[1]
+  np <- attr(curve$rocs,"data_info")$np[1]
+  
+  result <- c("egret",x, nn, np, auc_gm12878, prc_gm12878)
+  return(result)
+}
+
+egret_priors <- c(1)
+numEdges <- c(10,15,20,25,30,35,40,45,50)
+
+disrup_auc_topn<- data.frame()
+
+for (p in egret_priors){
+  for (x in numEdges){
+    result <- get_roc_for_top_x(p,x)
+    df <- data.frame(t(result), stringsAsFactors = FALSE)
+    disrup_auc_topn <- rbind(disrup_auc_topn,df)
+  }
+}
+
+colnames(disrup_auc_topn) <- c("egret","topN", "nn", "np", "AU-ROC", "AU-PR")
+disrup_auc_topn
+print(xtable(disrup_auc_topn[,c(2,3,4,5,6)], type = "latex", digits = 5), file = "../tables/disruption_auc_table_allHumanModels_topn_gm12878.tex",include.rownames=FALSE,)
+```
+
+```{r}
+colnames(validation_table_k562) <- c("id","tf","gene","panda","egret_k562","chipseq_gk562","diff_k562")
+
+get_roc_for_top_x <- function(egretNum, x) {
+  
+  top_x_table_k562 <- top_n(validation_table_k562, x, diff_k562)
+  top_x_table_k562$disrupt <- 1 - top_x_table_k562$chipseq
+  curve <- evalmod(scores = top_x_table_k562$diff_k562, labels = top_x_table_k562$disrupt, posclass = 1)
+  aucs <- precrec::auc(curve)
+  autoplot(curve)
+  auc_k562 <- round(aucs$aucs[1], digits=4)
+  prc_k562 <- round(aucs$aucs[2], digits=4)
+  nn <- attr(curve$rocs,"data_info")$nn[1]
+  np <- attr(curve$rocs,"data_info")$np[1]
+  
+  result <- c("egret",x, nn, np, auc_k562, prc_k562)
+  return(result)
+}
+
+egret_priors <- c(1)
+numEdges <- c(10,15,20,25,30,35,40,45,50)
+
+disrup_auc_topn<- data.frame()
+
+for (p in egret_priors){
+  for (x in numEdges){
+    result <- get_roc_for_top_x(p,x)
+    df <- data.frame(t(result), stringsAsFactors = FALSE)
+    disrup_auc_topn <- rbind(disrup_auc_topn,df)
+  }
+}
+
+colnames(disrup_auc_topn) <- c("egret","topN", "nn", "np", "AU-ROC", "AU-PR")
+disrup_auc_topn
+print(xtable(disrup_auc_topn[,c(2,3,4,5,6)], type = "latex", digits = 5), file = "../tables/disruption_auc_table_allHumanModels_topn_k562.tex",include.rownames=FALSE,)
+```
+
+```{r}
 pallet <- c("#870E75"  ,  "#0BB19F" )
 color <- "#870E75"
 #GM12878
 top_x_table_gm12878 <- top_n(validation_table_gm12878, 35, diff_gm12878)
 top_x_table_gm12878$disrupt <- 1 - top_x_table_gm12878$chipseq
 curve <- evalmod(scores = top_x_table_gm12878$diff_gm12878, labels = top_x_table_gm12878$disrupt, posclass = 1)
+aucs <- precrec::auc(curve)
 autoplot(curve)
+auc_gm12878 <- c("GM12878","AU-ROC",round(aucs$aucs[1], digits=4))
+prc_gm12878 <- c("GM12878","AU-PR",round(aucs$aucs[2], digits=4))
 
 roc <- as.data.frame(curve$rocs[[1]]$x)
 colnames(roc) <- c("x")
@@ -570,6 +715,10 @@ top_x_table_k562 <- top_n(validation_table_k562, 35, diff_k562)
 top_x_table_k562$disrupt <- 1 - top_x_table_k562$chipseq
 curve <- evalmod(scores = top_x_table_k562$diff_k562, labels = top_x_table_k562$disrupt, posclass = 1)
 autoplot(curve)
+aucs <- precrec::auc(curve)
+auc_k562<- c("K562","AU-ROC",round(aucs$aucs[1],digits = 4))
+prc_k562 <- c("K562","AU-PR",round(aucs$aucs[2],digits = 4))
+
 
 roc <- as.data.frame(curve$rocs[[1]]$x)
 colnames(roc) <- c("x")
@@ -592,3 +741,216 @@ dev.off()
 
 ```
 
+
+```{r}
+table <- rbind(auc_gm12878,prc_gm12878,auc_k562, prc_k562)
+colnames(table) <- c("Cell type","Measure","Area")
+print(xtable(table, type = "latex", digits = 4), file = "../tables/aucs_disruption.tex",include.rownames=FALSE,)
+```
+
+# Analysis of edited prior edges
+```{r}
+# load gm12878 edited prior edges
+edited_gm12878 <- read.table("../outputs/edge_modifications_EGRET_na12878_08142020.txt", header = FALSE)
+dim(edited_gm12878)
+colnames(edited_gm12878) <- c("tf","gene","id","mod")
+
+p1 <- ggplot(edited_gm12878, aes(x=mod)) + geom_density(alpha = 0.1, fill=pallet[3], col = pallet[3]) + theme_bw() + scale_color_manual(values=pallet) + scale_fill_manual(values=pallet) +labs(title="GM12878", x ="Prior modification", y = "Frequency")
+
+
+edited_gm12878_chip <- edited_gm12878[which(edited_gm12878$tf %in% chipseq_regnet_gm12878$tf),]
+edited_gm12878_chip$chipseq <- ifelse(edited_gm12878_chip$id %in% chipseq_regnet_gm12878$id, 1, 0)
+
+# count number of 1's
+dim(edited_gm12878_chip[edited_gm12878_chip$chipseq == 1,])
+dim(edited_gm12878_chip[edited_gm12878_chip$chipseq == 0,])
+```
+
+# Analysis of edited prior edges
+```{r}
+# load k562 edited prior edges
+edited_k562 <- read.table("../outputs/edge_modifications_finalEgret_v1_k562_eQTL_06182020.txt", header = FALSE)
+dim(edited_k562)
+colnames(edited_k562) <- c("tf","gene","id","mod")
+
+p2 <- ggplot(edited_k562, aes(x=mod)) + geom_density(alpha = 0.1, fill=pallet[2], col = pallet[2]) + theme_bw() + scale_color_manual(values=pallet) + scale_fill_manual(values=pallet) +labs(title="K562", x ="Prior modification", y = "Frequency")
+p2
+p3 <- grid.arrange(p1 + theme(legend.position="none"), p2 + theme(legend.position="none"), nrow=1, widths = c(4,4))
+p3
+
+p4 <- annotate_figure(p3,top = text_grob("Prior modification distributions (only human QBiC models)", color = "black", face = "bold", size = 14))
+pdf("../figures/modification_distribution_humanModels.pdf",width = 6, height = 4)
+plot(p4)
+dev.off()
+
+edited_k562_chip <- edited_k562[which(edited_k562$tf %in% chipseq_regnet_k562$tf),]
+edited_k562_chip$chipseq <- ifelse(edited_k562_chip$id %in% chipseq_regnet_k562$id, 1, 0)
+
+# count number of 1's
+dim(edited_k562_chip[edited_k562_chip$chipseq == 1,])
+dim(edited_k562_chip[edited_k562_chip$chipseq == 0,])
+```
+
+# Subset to modified edges only
+Make columns for chipseq, edge weight, prior mod and prior edge weight
+
+```{r}
+library(xtable)
+library(jcolors)
+library(precrec)
+library(gridExtra)
+library(grid)
+library(tidyr)
+library(plyr)
+library(ggpubr)
+library(dplyr)
+library(pROC)
+library(viridis)
+library(lemon)
+library(GenomicRanges)
+library(ggplot2)
+library(reshape2)
+library(rtracklayer)
+
+# read in the gene annotation file with gene ranges.
+genes <- read.table("../annotation/ensembl_genes_from_ucsc.txt", header = TRUE,sep = "\t")
+genes$promotorLeft <- ifelse(genes$strand == "+", (genes$txStart + 1 - 750), (genes$txEnd-250))
+genes$promotorRight <- ifelse(genes$strand == "+", (genes$txStart + 1 + 250), (genes$txEnd+750))
+gr_genes_promotor <- GRanges(seqnames = genes$chrom, ranges = IRanges(start = genes$promotorLeft, end = genes$promotorRight), strand = NULL, mcols = genes[,13:15])
+
+# chipseq chipseq data
+gr_chipseq_gm12878 <- import(chipseq_gm12878)
+overlaps_gm12878 <- data.frame(findOverlaps(gr_chipseq_gm12878, gr_genes_promotor))
+overlaps_gm12878$tf_name <- gr_chipseq_gm12878$name[overlaps_gm12878$queryHits]
+overlaps_gm12878$gene_name <- gr_genes_promotor$mcols.name2[overlaps_gm12878$subjectHits]
+validation_regnet_gm12878 <- separate(overlaps_gm12878, tf_name, c("exp", "tf", "cell line"), "\\.")
+chipseq_regnet_gm12878 <- distinct(validation_regnet_gm12878[,c("tf","gene_name")])
+chipseq_regnet_gm12878$id <- paste0(chipseq_regnet_gm12878$tf,chipseq_regnet_gm12878$gene)
+
+gr_chipseq_k562 <- import(chipseq_k562)
+overlaps_k562 <- data.frame(findOverlaps(gr_chipseq_k562, gr_genes_promotor))
+overlaps_k562$tf_name <- gr_chipseq_k562$name[overlaps_k562$queryHits]
+overlaps_k562$gene_name <- gr_genes_promotor$mcols.name2[overlaps_k562$subjectHits]
+validation_regnet_k562 <- separate(overlaps_k562, tf_name, c("exp", "tf", "cell line"), "\\.")
+chipseq_regnet_k562 <- distinct(validation_regnet_k562[,c("tf","gene_name")])
+chipseq_regnet_k562$id <- paste0(chipseq_regnet_k562$tf,chipseq_regnet_k562$gene)
+
+load("../outputs/validation_table_gm12878_08052020.RData")
+load("../outputs/validation_table_k562_08052020.RData")
+```
+
+```{r}
+edited_gm12878_chip$prior <- 1 - edited_gm12878_chip$mod
+edited_gm12878_chip$egret <- validation_table_gm12878$egret_GM12878[match(edited_gm12878_chip$id, validation_table_gm12878$id)]
+edited_gm12878_chip$disrup <- validation_table_gm12878$diff_egret[match(edited_gm12878_chip$id, validation_table_gm12878$id)]
+edges_for_valid_gm12878 <- edited_gm12878_chip[which(!(is.na(edited_gm12878_chip$egret))),]
+
+edited_k562_chip$prior <- 1 - edited_k562_chip$mod
+edited_k562_chip$egret <- validation_table_k562$egret_k562[match(edited_k562_chip$id, validation_table_k562$id)]
+edited_k562_chip$disrup <- validation_table_k562$diff_egret[match(edited_k562_chip$id, validation_table_k562$id)]
+edges_for_valid_k562 <- edited_k562_chip[which(!(is.na(edited_k562_chip$egret))),]
+```
+
+
+boxplots - GM12878
+```{r}
+# egret weight - 0's have lower
+test <- t.test(edges_for_valid_gm12878[which(edges_for_valid_gm12878$chipseq == 0),]$egret,edges_for_valid_gm12878[which(edges_for_valid_gm12878$chipseq == 1),]$egret, alternative="less")
+
+ggplot(edges_for_valid_gm12878, aes(x = as.factor(chipseq), y = egret, color = as.factor(chipseq), group = as.factor(chipseq)))+ geom_boxplot() + geom_jitter(position=position_jitter(0.1))+  stat_summary(fun.y=mean, geom="point", shape=18,size=5, color="#E41A1C") + theme_bw() + scale_color_manual(values=pallet)  + theme(legend.position="right") + labs(title="GM12878", x ="ChIP-seq binding", y = "score", color  = "ChIP-seq binding") + annotate("text", x = 1.6, y = 7.5, label = paste0("t-test p= ",signif(test$p.value,4)))
+
+# egret prior - 0's have lower
+test <- t.test(edges_for_valid_gm12878[which(edges_for_valid_gm12878$chipseq == 0),]$prior,edges_for_valid_gm12878[which(edges_for_valid_gm12878$chipseq == 1),]$prior, alternative="less")
+
+ggplot(edges_for_valid_gm12878, aes(x = as.factor(chipseq), y = prior, color = as.factor(chipseq), group = as.factor(chipseq)))+ geom_boxplot() + geom_jitter(position=position_jitter(0.1))+  stat_summary(fun.y=mean, geom="point", shape=18,size=5, color="#E41A1C") + theme_bw() + scale_color_manual(values=pallet)  + theme(legend.position="right") + labs(title="GM12878", x ="ChIP-seq binding", y = "score", color  = "ChIP-seq binding") + annotate("text", x = 1.6, y = 7.5, label = paste0("t-test p= ",signif(test$p.value,4)))
+
+# egret mod - 1's have lower
+test <- t.test(edges_for_valid_gm12878[which(edges_for_valid_gm12878$chipseq == 0),]$mod,edges_for_valid_gm12878[which(edges_for_valid_gm12878$chipseq == 1),]$mod, alternative="greater")
+
+ggplot(edges_for_valid_gm12878, aes(x = as.factor(chipseq), y = mod, color = as.factor(chipseq), group = as.factor(chipseq)))+ geom_boxplot() + geom_jitter(position=position_jitter(0.1))+  stat_summary(fun.y=mean, geom="point", shape=18,size=5, color="#E41A1C") + theme_bw() + scale_color_manual(values=pallet)  + theme(legend.position="right") + labs(title="GM12878", x ="ChIP-seq binding", y = "score", color  = "ChIP-seq binding") + annotate("text", x = 1.6, y = 7.5, label = paste0("t-test p= ",signif(test$p.value,4)))
+
+# disrup - 1's have lower
+test <- t.test(edges_for_valid_gm12878[which(edges_for_valid_gm12878$chipseq == 0),]$disrup,edges_for_valid_gm12878[which(edges_for_valid_gm12878$chipseq == 1),]$disrup, alternative="greater")
+
+ggplot(edges_for_valid_gm12878, aes(x = as.factor(chipseq), y = disrup, color = as.factor(chipseq), group = as.factor(chipseq)))+ geom_boxplot() + geom_jitter(position=position_jitter(0.1))+  stat_summary(fun.y=mean, geom="point", shape=18,size=5, color="#E41A1C") + theme_bw() + scale_color_manual(values=pallet)  + theme(legend.position="right") + labs(title="GM12878", x ="ChIP-seq binding", y = "score", color  = "ChIP-seq binding") + annotate("text", x = 1.6, y = 7.5, label = paste0("t-test p= ",signif(test$p.value,4)))
+
+```
+
+boxplots - K562
+```{r}
+# egret weight - 0's have lower
+test <- t.test(edges_for_valid_k562[which(edges_for_valid_k562$chipseq == 0),]$egret,edges_for_valid_k562[which(edges_for_valid_k562$chipseq == 1),]$egret, alternative="less")
+
+ggplot(edges_for_valid_k562, aes(x = as.factor(chipseq), y = egret, color = as.factor(chipseq), group = as.factor(chipseq)))+ geom_boxplot() + geom_jitter(position=position_jitter(0.1))+  stat_summary(fun.y=mean, geom="point", shape=18,size=5, color="#E41A1C") + theme_bw() + scale_color_manual(values=pallet)  + theme(legend.position="right") + labs(title="K562", x ="ChIP-seq binding", y = "score", color  = "ChIP-seq binding") + annotate("text", x = 1.6, y = 7.5, label = paste0("t-test p= ",signif(test$p.value,4)))
+
+# egret prior - 0's have lower
+test <- t.test(edges_for_valid_k562[which(edges_for_valid_k562$chipseq == 0),]$prior,edges_for_valid_k562[which(edges_for_valid_k562$chipseq == 1),]$prior, alternative="less")
+
+ggplot(edges_for_valid_k562, aes(x = as.factor(chipseq), y = prior, color = as.factor(chipseq), group = as.factor(chipseq)))+ geom_boxplot() + geom_jitter(position=position_jitter(0.1))+  stat_summary(fun.y=mean, geom="point", shape=18,size=5, color="#E41A1C") + theme_bw() + scale_color_manual(values=pallet)  + theme(legend.position="right") + labs(title="K562", x ="ChIP-seq binding", y = "score", color  = "ChIP-seq binding") + annotate("text", x = 1.6, y = 7.5, label = paste0("t-test p= ",signif(test$p.value,4)))
+
+# egret mod - 1's have lower
+test <- t.test(edges_for_valid_k562[which(edges_for_valid_k562$chipseq == 0),]$mod,edges_for_valid_k562[which(edges_for_valid_k562$chipseq == 1),]$mod, alternative="greater")
+
+ggplot(edges_for_valid_k562, aes(x = as.factor(chipseq), y = mod, color = as.factor(chipseq), group = as.factor(chipseq)))+ geom_boxplot() + geom_jitter(position=position_jitter(0.1))+  stat_summary(fun.y=mean, geom="point", shape=18,size=5, color="#E41A1C") + theme_bw() + scale_color_manual(values=pallet)  + theme(legend.position="right") + labs(title="K562", x ="ChIP-seq binding", y = "score", color  = "ChIP-seq binding") + annotate("text", x = 1.6, y = 7.5, label = paste0("t-test p= ",signif(test$p.value,4)))
+
+# disrup - 1's have lower
+test <- t.test(edges_for_valid_k562[which(edges_for_valid_k562$chipseq == 0),]$disrup,edges_for_valid_k562[which(edges_for_valid_k562$chipseq == 1),]$disrup, alternative="greater")
+
+ggplot(edges_for_valid_k562, aes(x = as.factor(chipseq), y = disrup, color = as.factor(chipseq), group = as.factor(chipseq)))+ geom_boxplot() + geom_jitter(position=position_jitter(0.1))+  stat_summary(fun.y=mean, geom="point", shape=18,size=5, color="#E41A1C") + theme_bw() + scale_color_manual(values=pallet)  + theme(legend.position="right") + labs(title="K562", x ="ChIP-seq binding", y = "score", color  = "ChIP-seq binding") + annotate("text", x = 1.6, y = 7.5, label = paste0("t-test p= ",signif(test$p.value,4)))
+
+```
+
+
+predict disruption aucs
+
+```{r}
+pallet <- c("#870E75"  ,  "#0BB19F" )
+color <- "#870E75"
+edges_for_valid_gm12878$binding_disrup <- 1 - edges_for_valid_gm12878$chipseq
+curve <- evalmod(scores = edges_for_valid_gm12878$disrup, labels = edges_for_valid_gm12878$binding_disrup, posclass = 1)
+aucs <- precrec::auc(curve)
+autoplot(curve)
+auc_gm12878 <- c("GM12878","AU-ROC",round(aucs$aucs[1], digits=4))
+prc_gm12878 <- c("GM12878","AU-PR",round(aucs$aucs[2], digits=4))
+
+roc <- as.data.frame(curve$rocs[[1]]$x)
+colnames(roc) <- c("x")
+roc$y <- curve$rocs[[1]]$y
+
+pr <- as.data.frame(curve$prcs[[1]]$x)
+colnames(pr) <- c("x")
+pr$y <- curve$prcs[[1]]$y
+
+roccurves_gm12878 <- ggplot(roc, aes(x=x, y=y, color = color)) + geom_line() +  theme_bw() + scale_color_manual(values=c(color)) + xlim(0,1) + ylim(0,1) + geom_abline(intercept = 0, slope = 1, linetype = 2) + labs(title="ROC-disruption (GM12878)", x ="1 - Specificity", y = "Sensitivity")
+
+prcurves_gm12878 <- ggplot(pr, aes(x=x, y=y, color=color)) + geom_line() +  theme_bw() + scale_color_manual(values=c(color)) + xlim(0,1) + ylim(0,1) + labs(title="PR-disruption (GM12878)", x ="Recall", y = "Precision") 
+
+# K562
+top_x_table_k562 <- top_n(validation_table_k562, 35, diff_k562)
+top_x_table_k562$disrupt <- 1 - top_x_table_k562$chipseq
+curve <- evalmod(scores = top_x_table_k562$diff_k562, labels = top_x_table_k562$disrupt, posclass = 1)
+autoplot(curve)
+aucs <- precrec::auc(curve)
+auc_k562<- c("K562","AU-ROC",round(aucs$aucs[1],digits = 4))
+prc_k562 <- c("K562","AU-PR",round(aucs$aucs[2],digits = 4))
+
+
+roc <- as.data.frame(curve$rocs[[1]]$x)
+colnames(roc) <- c("x")
+roc$y <- curve$rocs[[1]]$y
+
+pr <- as.data.frame(curve$prcs[[1]]$x)
+colnames(pr) <- c("x")
+pr$y <- curve$prcs[[1]]$y
+
+roccurves_k562 <- ggplot(roc, aes(x=x, y=y, color = color)) + geom_line() +  theme_bw() + scale_color_manual(values=color) + xlim(0,1) + ylim(0,1) + geom_abline(intercept = 0, slope = 1, linetype = 2) + labs(title="ROC-disruption (K562)", x ="1 - Specificity", y = "Sensitivity")
+
+prcurves_k562 <- ggplot(pr, aes(x=x, y=y, color=color)) + geom_line() +  theme_bw() + scale_color_manual(values=color) + xlim(0,1) + ylim(0,1) + labs(title="PR-disruption (K562)", x ="Recall", y = "Precision") 
+
+p3 <- grid.arrange(roccurves_gm12878 + theme(legend.position="hidden"), prcurves_gm12878 + theme(legend.position="none"),roccurves_k562 + theme(legend.position="hidden"), prcurves_k562 + theme(legend.position="none"), nrow=2, widths = c(4,4),heights = c(4,4))
+
+p4 <- annotate_figure(p3,top = text_grob("Performance curves predicting disruption", color = "black", face = "bold", size = 14))
+pdf("../figures/disruption_performance_curves_top35_humanModels.pdf",width = 6, height = 4)
+plot(p4)
+dev.off()
+```

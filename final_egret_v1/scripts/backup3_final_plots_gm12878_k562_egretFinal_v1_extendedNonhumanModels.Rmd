@@ -559,7 +559,7 @@ save(combined_table, file = "../outputs/combined.RData")
 
 # Cell line difference validation
 
-## Approach 1: ChIP-seq (differential binding edge comparison)
+## Approach 1: ChIP-seq
 
 Are differences in cell lines based on EGRET edge weights enriched for difference in ChIP-seq binding between cell lines
 
@@ -574,12 +574,23 @@ combined_table$diff_celline_egret <- abs(combined_table$egret_k562-combined_tabl
 # calculate difference in ChIP-seq binding
 combined_table$diff_chip_k_g <- abs(combined_table$chipseq_k562-combined_table$chipseq_gm12878)
 
+# aggregate by gene
+gene_ag <- aggregate(combined_table$diff_celline_egret, by = list(combined_table$gene), FUN = sum)
+colnames(gene_ag) <- c("gene","sum_diff_k_g")
+
+gene_ag_chip <- aggregate(combined_table$diff_chip_k_g, by = list(combined_table$gene), FUN = sum)
+colnames(gene_ag_chip) <- c("gene","sum_diff_chip")
+
 ```
 
 
 Test if top difference edges between genotypes are enriched in diff chipseq, using a t test and a fisher test
 ```{r}
 data <- combined_table
+#curve_data <- evalmod(scores = data$diff_diff_egret_k_g, labels = data$diff_chip_k_g)
+#autoplot(curve_data)
+#curve_data
+
 mylist <- as.vector(data[order(-as.numeric(as.vector(data$diff_celline_egret))),1])
 subset <- as.vector(data[which(data$diff_chip_k_g == 1),1])
 test <- TestNodeRank(mylist, subset)
@@ -592,13 +603,16 @@ t.test(data[which(data$diff_chip_k_g == 1),]$diff_celline_egret,data[which(data$
 
 mean(data[which(data$diff_chip_k_g == 1),]$diff_celline_egret)
 mean(data[which(data$diff_chip_k_g == 0),]$diff_celline_egret)
+
+#ggplot(data[,c(1,2,3,12,13,17)], aes(x = as.factor(diff_chip_k_g), y = diff_diff_egret_k_g, color = as.factor(diff_chip_k_g), group = as.factor(diff_chip_k_g)))+ geom_boxplot() + geom_jitter(position=position_jitter(0.1))+  stat_summary(fun.y=mean, geom="point", shape=18,size=5, color="#E41A1C") + theme_bw() + scale_color_manual(values=pallet)  + theme(legend.position="right") 
+
+
 ```
 
-## Approach 2: ASE (differential gene regulation comparison)
+## Approach 2: ASE
 
 Are high difference edges enriched for ASE
 ```{r}
-#load complete edge talbes - dont need to overlap with chipseq here
 load("../outputs/edge_table_gm12878_extended_08052020.RData")
 load("../outputs/edge_table_k562_extended_08052020.RData")
 
@@ -612,24 +626,103 @@ save(combined_table_all, file = "../outputs/combined_all.RData")
 load("../outputs/combined_all.RData")
 combined_table_all$diff_celline_egret <- abs(combined_table_all$diff_k-combined_table_all$diff_g)
 
-ase_promotor <- read.table("../ase/ase_mapped_motifs_09012020.txt", header = FALSE)
-colnames(ase_promotor) <- c("tf","gene","pval","fdr","chr","pos")
-ase_promotor$snpID <- paste0(ase_promotor$chr,"_",ase_promotor$pos)
-ase_promotor$id <- paste0(ase_promotor$tf,ase_promotor$gene)
-ase_promotor_signif <- ase_promotor[which(ase_promotor$fdr <= 0.1),]
+# load ase snps which exist in the promotors of genes and select significant entries
+bbseq_promotor <- read.table("../ase/ase_mapped_promotor_09032020.txt", header = FALSE)
+colnames(bbseq_promotor) <- c("gene","pval","fdr")
+bbseq_promotor_signif <- bbseq_promotor[which(bbseq_promotor$fdr <= 0.1),]
 
-combined_table_all_ase_tested <- combined_table_all[which(combined_table_all$id %in% ase_promotor$id),]
-combined_table_all_ase_tested$ase_signif <- ifelse(combined_table_all_ase_tested$id %in% ase_promotor_signif$id, 1, 0)
+# label edges with those which have significant ase, and limit onlt to genes which had an ase snp in their promotor tested
+combined_table_all$bbseq_gene_promotor <- ifelse(combined_table_all$gene %in% bbseq_promotor_signif$gene, 1, 0)
+combined_table_all_bbseq_tested_gene_promotor <- combined_table_all[which(combined_table_all$gene %in% bbseq_promotor$gene),]
 
 # aggregate by gene
-gene_ag <- aggregate(combined_table_all_ase_tested$diff_celline_egret, by = list(combined_table_all_ase_tested$gene), FUN = sum)
+gene_ag <- aggregate(combined_table_all_bbseq_tested_gene_promotor$diff_celline_egret, by = list(combined_table_all_bbseq_tested_gene_promotor$gene), FUN = sum)
 colnames(gene_ag) <- c("gene","sum_diff_k_g")
-gene_ag$ase_signif <- ifelse(gene_ag$gene %in% ase_promotor_signif$gene, 1, 0)
+gene_ag$bbseq_gene_promotor <- ifelse(gene_ag$gene %in% bbseq_promotor_signif$gene, 1, 0)
+```
 
-
-# test enrichment
+This next code chunk tells us that genes with high overall difference in disruption between two cell lines are enriched for ASE.
+```{r}
 data <- gene_ag
 mylist <- as.vector(data[order(-as.numeric(as.vector(data$sum_diff_k_g))),1])
+subset <- data[which(data$bbseq_gene_promotor == 1),1]
+test <- TestNodeRank(mylist, subset)
+test
+
+length(mylist)
+length(subset)
+
+t.test(data[which(data$bbseq_gene_promotor == 1),]$sum_diff_k_g,data[which(data$bbseq_gene_promotor == 0),]$sum_diff_k_g, alternative="greater")
+
+mean(data[which(data$bbseq_gene == 1),]$sum_diff_k_g)
+mean(data[which(data$bbseq_gene == 0),]$sum_diff_k_g)
+```
+
+The reason why we enrich by gene is that the SNP overlap is very very low. The Number of SNPs which we can actually overlap with SNPs we had an actual chance of editing with overlaps by only ...... But we try to agglomerate with a gene level statistic.
+
+
+
+```{r}
+eqtls <- read.table("../inputs/eQTL_in_motif_promotor_adjacent_egene_finalEGRET_v1_06172020.txt", header = FALSE)
+colnames(eqtls) <- c("tf","gene","pos","chr","beta")
+eqtls$id <- paste0(eqtls$tf,eqtls$gene)
+eqtls$snpID <- paste0(eqtls$chr,"_",eqtls$pos)
+
+# load ase snps which exist in the promotors of genes and select significant entries
+bbseq_promotor <- read.table("../ase/ase_mapped_promotor_09032020.txt", header = FALSE)
+colnames(bbseq_promotor) <- c("gene","pval","fdr","chr","pos")
+bbseq_promotor$snpID <- paste0(bbseq_promotor$chr,"_",bbseq_promotor$pos)
+bbseq_promotor$id <- paste0(bbseq_promotor$tf,bbseq_promotor$gene)
+ase_isEqtl <- bbseq_promotor[which(bbseq_promotor$snpID %in% eqtls$snpID),]
+ase_iseQTL_signif <- ase_isEqtl[which(ase_isEqtl$pval <= 1e-4),]
+
+
+# label edges with those which have significant ase, and limit only to edges which (1) could be edited because have a eQTL and (2) were tested for ase
+combined_table_all_ase_background <- combined_table_all[which((combined_table_all$id %in% bbseq_promotor$id) & (combined_table_all$id)),]
+combined_table_all_bbseq_tested_gene_promotor$ase_signif <- ifelse(combined_table_all_bbseq_tested_gene_promotor$id %in% bbseq_promotor_signif$id, 1, 0)
+
+
+# aggregate by gene
+gene_ag <- aggregate(combined_table_all_bbseq_tested_gene_promotor$diff_celline_egret, by = list(combined_table_all_bbseq_tested_gene_promotor$gene), FUN = sum)
+colnames(gene_ag) <- c("gene","sum_diff_k_g")
+gene_ag$bbseq_gene_promotor <- ifelse(gene_ag$gene %in% bbseq_promotor_signif$gene, 1, 0)
+```
+
+
+
+
+by edge
+
+```{r}
+#eqtls <- read.table("../inputs/eQTL_in_motif_promotor_adjacent_egene_finalEGRET_v1_06172020.txt", header = FALSE)
+#colnames(eqtls) <- c("tf","gene","pos","chr","beta")
+#eqtls$id <- paste0(eqtls$tf,eqtls$gene)
+#eqtls$snpID <- paste0(eqtls$chr,"_",eqtls$pos)
+
+# load ase snps which exist in the promotors of genes and select significant entries
+bbseq_promotor <- read.table("../ase/ase_mapped_motifs_09012020.txt", header = FALSE)
+colnames(bbseq_promotor) <- c("tf","gene","pval","fdr","chr","pos")
+bbseq_promotor$snpID <- paste0(bbseq_promotor$chr,"_",bbseq_promotor$pos)
+bbseq_promotor$id <- paste0(bbseq_promotor$tf,bbseq_promotor$gene)
+bbseq_promotor_signif <- bbseq_promotor[which(bbseq_promotor$fdr <= 0.1),]
+#ase_isEqtl <- bbseq_promotor[which(bbseq_promotor$snpID %in% eqtls$snpID),]
+#ase_iseQTL_signif <- ase_isEqtl[which(ase_isEqtl$fdr <= 0.1),]
+
+
+# label edges with those which have significant ase, and limit only to edges which (1) could be edited because have a eQTL and (2) were tested for ase
+combined_table_all_ase_background <- combined_table_all[which(combined_table_all$id %in% bbseq_promotor$id),]
+combined_table_all_ase_background$ase_signif <- ifelse(combined_table_all_ase_background$id %in% bbseq_promotor_signif$id, 1, 0)
+
+# aggregate by gene
+gene_ag <- aggregate(combined_table_all_ase_background$diff_celline_egret, by = list(combined_table_all_ase_background$gene), FUN = sum)
+colnames(gene_ag) <- c("gene","sum_diff_k_g")
+gene_ag$bbseq_gene_promotor <- ifelse(gene_ag$gene %in% bbseq_promotor_signif$gene, 1, 0)
+```
+
+
+```{r}
+data <- combined_table_all_ase_background
+mylist <- as.vector(data[order(-as.numeric(as.vector(data$diff_celline_egret))),1])
 subset <- data[which(data$ase_signif == 1),1]
 test <- TestNodeRank(mylist, subset)
 test
@@ -637,19 +730,27 @@ test
 length(mylist)
 length(subset)
 
-t.test(data[which(data$ase_signif == 1),]$sum_diff_k_g,data[which(data$ase_signif == 0),]$sum_diff_k_g, alternative="greater")
+t.test(data[which(data$ase_signif == 1),]$diff_celline_egret,data[which(data$ase_signif == 0),]$diff_celline_egret, alternative="greater")
 
-mean(data[which(data$ase_signif == 1),]$sum_diff_k_g)
-mean(data[which(data$ase_signif == 0),]$sum_diff_k_g)
+mean(data[which(data$bbseq_gene == 1),]$sum_diff_k_g)
+mean(data[which(data$bbseq_gene == 0),]$sum_diff_k_g)
 
+data <- gene_ag
+mylist <- as.vector(data[order(-as.numeric(as.vector(data$sum_diff_k_g))),1])
+subset <- data[which(data$bbseq_gene_promotor == 1),1]
+test <- TestNodeRank(mylist, subset)
+test
+
+length(mylist)
+length(subset)
+
+t.test(data[which(data$bbseq_gene_promotor == 1),]$sum_diff_k_g,data[which(data$bbseq_gene_promotor == 0),]$sum_diff_k_g, alternative="greater")
+
+mean(data[which(data$bbseq_gene == 1),]$sum_diff_k_g)
+mean(data[which(data$bbseq_gene == 0),]$sum_diff_k_g)
 ```
 
-
-The reason why we enrich by gene is that the SNP overlap is very very low. The Number of SNPs which we can actually overlap with SNPs we had an actual chance of editing with overlaps by only ...... But we try to agglomerate with a gene level statistic.
-
-
-
-# Approach 3: caQTLs (differential gene regulation comparison)
+# Approach 3: caQTLs
 ```{r}
 # load caQTLs in motifs in promotors
 caqtl <- read.table("../caqtl/caqtl_mapped_motifs_09092020.txt", header = FALSE)
@@ -664,8 +765,20 @@ combined_table_all_caqtl_tested <- combined_table_all[which(combined_table_all$i
 # mark edges as significant caQTL or not
 combined_table_all_caqtl_tested$caqtl_signif <- ifelse(combined_table_all_caqtl_tested$id %in% caqtl_signif$edge_id, 1, 0)
 
+# do enrichment of qtl/not in difference score
+mylist <- as.vector(combined_table_all_caqtl_tested[order(-as.numeric(as.vector(combined_table_all_caqtl_tested$diff_celline_egret))),1])
+subset <- combined_table_all_caqtl_tested[which(combined_table_all_caqtl_tested$caqtl_signif == 1),1]
+test <- TestNodeRank(mylist, subset)
+test
 
-#aggregate by gene
+length(mylist)
+length(subset)
+
+t.test(combined_table_all_caqtl_tested[which(combined_table_all_caqtl_tested$c == 1),]$diff_celline_egret,combined_table_all_caqtl_tested[which(combined_table_all_caqtl_tested$bbseq_gene_promotor == 0),]$diff_celline_egret, alternative="greater")
+
+mean(combined_table_all_caqtl_tested[which(combined_table_all_caqtl_tested$caqtl_signif == 1),]$diff_celline_egret)
+mean(combined_table_all_caqtl_tested[which(combined_table_all_caqtl_tested$caqtl_signif == 0),]$diff_celline_egret)
+
 gene_ag <- aggregate(combined_table_all_caqtl_tested$diff_celline_egret, by = list(combined_table_all_caqtl_tested$gene), FUN = sum)
 colnames(gene_ag) <- c("gene","sum_diff_k_g")
 gene_ag$cqtl <- ifelse(gene_ag$gene %in% caqtl_signif$gene, 1, 0)
@@ -683,9 +796,41 @@ t.test(gene_ag[which(gene_ag$cqtl == 1),]$sum_diff_k_g,gene_ag[which(gene_ag$cqt
 
 ```
 
+noice
 
 
+# Approach 3: caQTLs promotor only
+```{r}
+# load caQTLs in motifs in promotors
+caqtl <- read.table("../caqtl/caqtl_mapped_promotor_09092020.txt", header = FALSE)
+colnames(caqtl) <- c("query","subject","gene","pval","chrom","pos")
+caqtl$snpID <- paste0(caqtl$chrom,"_",caqtl$pos)
+caqtl_signif <- caqtl[which(caqtl$pval < 1e-5),]
 
+# subset combined g/k edges to those which are tested for caQTLs
+combined_table_all_caqtl_tested <- combined_table_all[which(combined_table_all$gene %in% caqtl$gene),]
+
+# mark edges as significant caQTL or not
+combined_table_all_caqtl_tested$caqtl_signif <- ifelse(combined_table_all_caqtl_tested$gene %in% caqtl_signif$gene, 1, 0)
+
+# do enrichment of qtl/not in difference score
+gene_ag <- aggregate(combined_table_all_caqtl_tested$diff_celline_egret, by = list(combined_table_all_caqtl_tested$gene), FUN = sum)
+
+colnames(gene_ag) <- c("gene","sum_diff_k_g")
+gene_ag$cqtl <- ifelse(gene_ag$gene %in% caqtl_signif$gene, 1, 0)
+
+mylist <- as.vector(gene_ag[order(-as.numeric(as.vector(gene_ag$sum_diff_k_g))),1])
+subset <- gene_ag[which(gene_ag$cqtl == 1),1]
+test <- TestNodeRank(mylist, subset)
+test
+
+length(mylist)
+length(subset)
+
+t.test(gene_ag[which(gene_ag$cqtl == 1),]$sum_diff_k_g,gene_ag[which(gene_ag$cqtl == 0),]$sum_diff_k_g, alternative="greater")
+
+
+```
 
 # Now make table of snps which contribute and are also caQTLs
 ```{r}

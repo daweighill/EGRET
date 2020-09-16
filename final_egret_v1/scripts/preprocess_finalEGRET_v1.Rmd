@@ -295,3 +295,117 @@ lcl_expr_df <- data.frame(lcl_expr, row.names = 1)
 clean_data <- lcl_expr_df[(rowSums(lcl_expr_df != 0) > 50),]
 save(clean_data, file = "../inputs/expr_data_finalEGRET_v1_06172020.RData")
 ```
+
+# Map allele-specific expression (ASE) SNPs to motifs in promotors
+
+Get the data (downloaded 09/01/2020)
+
+wget https://genome.cshlp.org/content/suppl/2018/10/17/gr.237354.118.DC1/Supplemental_Table_S1_.txt
+```{r}
+# load ase data
+ase <- read.table("../ase/Supplemental_Table_S1_.txt", sep = " ", header = TRUE)
+ase_gr <- GRanges(seqnames = ase$chr, ranges = IRanges(start = ase$pos1, end = ase$pos1), strand = NULL, mcols = ase[,])
+
+
+# make motif-eGene network
+  motifs <- list.files(path="../motifs/mapped_motif_files/", pattern="*.txt", full.names=TRUE, recursive=FALSE)
+  lapply(motifs, function(y) {
+    # load file
+    motif <- read.table(y, header = FALSE, sep = "\t")
+    motif_name <- motif[1,1]
+    print(motif_name)
+    colnames(motif) <- c("motifName","chr","start","stop","adjacentGene")
+    gr_motif <- GRanges(seqnames = motif[,2], ranges = IRanges(start = motif[,3], end = motif[,4]), strand = NULL, mcols = motif[,c(1,5)])
+    
+  # overlap bitbundle snps with motifs 
+  ase_in_motif <- data.frame(findOverlaps(ase_gr, gr_motif))
+  ase_in_motif$tf <- gr_motif$mcols.motifName[ase_in_motif$subjectHits]
+  ase_in_motif$gene <- gr_motif$mcols.adjacentGene[ase_in_motif$subjectHits]
+  ase_in_motif$fdr <- ase_gr$mcols.padj_comb[ase_in_motif$queryHits]
+  ase_in_motif$pval <- ase_gr$mcols.p_comb[ase_in_motif$queryHits]
+  ase_in_motif$chr <- ase_gr$mcols.chr[ase_in_motif$queryHits]
+  ase_in_motif$pos <- ase_gr$mcols.pos1[ase_in_motif$queryHits]
+  write.table(ase_in_motif[,c(3:8)], file = "../ase/ase_mapped_motifs_09012020.txt", sep = "\t", quote = FALSE, append = TRUE, row.names =FALSE, col.names = FALSE)
+  })
+```
+
+Map only to promotor regions
+```{r}
+# load ase data
+ase <- read.table("../ase/Supplemental_Table_S1_.txt", sep = " ", header = TRUE)
+ase_gr <- GRanges(seqnames = ase$chr, ranges = IRanges(start = ase$pos1, end = ase$pos1), strand = NULL, mcols = ase[,])
+
+
+# map to promotor
+    
+  # overlap bitbundle snps with motifs 
+  ase_in_promotor <- data.frame(findOverlaps(ase_gr, gr_genes_promotor))
+  ase_in_promotor$gene <- gr_genes_promotor$mcols.name2[ase_in_promotor$subjectHits]
+  ase_in_promotor$fdr <- ase_gr$mcols.padj_comb[ase_in_promotor$queryHits]
+  ase_in_promotor$pval <- ase_gr$mcols.p_comb[ase_in_promotor$queryHits]
+  ase_in_promotor$chr <- ase_gr$mcols.chr[ase_in_promotor$queryHits]
+  ase_in_promotor$pos <- ase_gr$mcols.pos1[ase_in_promotor$queryHits]
+  write.table(unique(ase_in_promotor[,c(3:7)]), file = "../ase/ase_mapped_promotor_09032020.txt", sep = "\t", quote = FALSE, append = TRUE, row.names =FALSE, col.names = FALSE)
+```
+
+# Map allele-specific binding (ASB) SNPs for NFKB1 to promotors
+```{r}
+asb <- read.table("../ase/Supplemental_Table_S11.txt", header = TRUE)
+
+map <- read.table("../ase/Supplemental_Table_S1_.txt", header = TRUE, sep = " ")
+
+asb$pos <- map$pos1[match(asb$rsID, map$rsID)]
+asb$chr <- map$chr[match(asb$rsID, map$rsID)]
+mapped <- asb[which(!(is.na(asb$pos))),]
+asb_gr <- GRanges(seqnames = mapped$chr, ranges = IRanges(start = mapped$pos, end = mapped $pos), strand = NULL, mcols =  mapped[,])
+
+
+asb_in_promotor <- data.frame(findOverlaps(asb_gr, gr_genes_promotor))
+  asb_in_promotor$gene <- gr_genes_promotor$mcols.name2[asb_in_promotor$subjectHits]
+  asb_in_promotor$fdr <- asb_gr$mcols.padj[asb_in_promotor$queryHits]
+  asb_in_promotor$pval <- asb_gr$mcols.p_all[asb_in_promotor$queryHits]
+  asb_in_promotor$chr <- asb_gr$mcols.chr[asb_in_promotor$queryHits]
+    asb_in_promotor$pos <- asb_gr$mcols.pos[asb_in_promotor$queryHits]
+  write.table(unique(asb_in_promotor[,]), file = "../ase/asb_mapped_promotor_09042020.txt", sep = "\t", quote = FALSE, append = FALSE, row.names =FALSE, col.names = FALSE)
+```
+
+# Map caQTLs to promotor regions
+```{r}
+caQTL <- read.table("../caqtl/cht_results_full_LCL.txt", header = TRUE)
+
+  caqtl_gr <- GRanges(seqnames = caQTL$TEST.SNP.CHROM, ranges = IRanges(start = caQTL$TEST.SNP.POS, end = caQTL$TEST.SNP.POS), strand = NULL, mcols =  caQTL[,])
+
+
+caqtl_in_promotor <- data.frame(findOverlaps(caqtl_gr, gr_genes_promotor))
+  caqtl_in_promotor$gene <- gr_genes_promotor$mcols.name2[caqtl_in_promotor$subjectHits]
+  caqtl_in_promotor$pval <- caqtl_gr$mcols.P.VALUE[caqtl_in_promotor$queryHits]
+  caqtl_in_promotor$chr <- caqtl_gr$mcols.TEST.SNP.CHROM[caqtl_in_promotor$queryHits]
+    caqtl_in_promotor$pos <- caqtl_gr$mcols.TEST.SNP.POS[caqtl_in_promotor$queryHits]
+  write.table(unique(caqtl_in_promotor[,]), file = "../caqtl/caqtl_mapped_promotor_09092020.txt", sep = "\t", quote = FALSE, append = FALSE, row.names =FALSE, col.names = FALSE)
+```
+
+# map caqtl to motifs in promotors
+```{r}
+caQTL <- read.table("../caqtl/cht_results_full_LCL.txt", header = TRUE)
+caqtl_gr <- GRanges(seqnames = caQTL$TEST.SNP.CHROM, ranges = IRanges(start = caQTL$TEST.SNP.POS, end = caQTL$TEST.SNP.POS), strand = NULL, mcols =  caQTL[,])
+
+# make motif-eGene network
+  motifs <- list.files(path="../motifs/mapped_motif_files/", pattern="*.txt", full.names=TRUE, recursive=FALSE)
+  lapply(motifs, function(y) {
+    # load file
+    motif <- read.table(y, header = FALSE, sep = "\t")
+    motif_name <- motif[1,1]
+    print(motif_name)
+    colnames(motif) <- c("motifName","chr","start","stop","adjacentGene")
+    gr_motif <- GRanges(seqnames = motif[,2], ranges = IRanges(start = motif[,3], end = motif[,4]), strand = NULL, mcols = motif[,c(1,5)])
+    
+  # overlap bitbundle snps with motifs 
+  caqtl_in_motif <- data.frame(findOverlaps(caqtl_gr, gr_motif))
+  caqtl_in_motif$tf <- gr_motif$mcols.motifName[caqtl_in_motif$subjectHits]
+  caqtl_in_motif$gene <- gr_motif$mcols.adjacentGene[caqtl_in_motif$subjectHits]
+  caqtl_in_motif$chr <- caqtl_gr$mcols.TEST.SNP.CHROM[caqtl_in_motif$queryHits]
+    caqtl_in_motif$pos <- caqtl_gr$mcols.TEST.SNP.POS[caqtl_in_motif$queryHits]
+  caqtl_in_motif$pval <- caqtl_gr$mcols.P.VALUE[caqtl_in_motif$queryHits]
+  write.table(caqtl_in_motif[,], file = "../caqtl/caqtl_mapped_motifs_09092020.txt", sep = "\t", quote = FALSE, append = TRUE, row.names =FALSE, col.names = FALSE)
+  })
+```

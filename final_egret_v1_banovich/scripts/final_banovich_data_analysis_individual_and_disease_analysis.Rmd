@@ -26,7 +26,8 @@ library(ALPACA)
 library(gridExtra)
 library(grid)
 library(gridExtra)
-pallet <- c(    "#FFBF00",  "#870E75"  ,  "#0BB19F" )
+pallet <- c("#FFBF00",  "#870E75"  ,  "#0BB19F" )
+#amber, magenta, teal
 ```
 
 
@@ -158,6 +159,13 @@ system("perl /home/ubuntu/EGRET/final_egret_v1_banovich/scripts/parse_GWAS_assoc
 
 term <- "\"Crohn's disease\""
 command <- paste0("perl /home/ubuntu/EGRET/final_egret_v1_banovich/scripts/parse_GWAS_associations.pl /home/ubuntu/EGRET/final_egret_v1_banovich/gwas/gwas_catalog ",term," /home/ubuntu/EGRET/final_egret_v1_banovich/gwas/CD_gwas_parsed.txt")
+system(command)
+
+# also make tables of studies involved
+system("perl /home/ubuntu/EGRET/final_egret_v1_banovich/scripts/parse_GWAS_associations_for_table.pl /home/ubuntu/EGRET/final_egret_v1_banovich/gwas/gwas_catalog 'Coronary artery disease' /home/ubuntu/EGRET/final_egret_v1_banovich/tables/CAD_study_table.txt")
+
+term <- "\"Crohn's disease\""
+command <- paste0("perl /home/ubuntu/EGRET/final_egret_v1_banovich/scripts/parse_GWAS_associations_for_table.pl /home/ubuntu/EGRET/final_egret_v1_banovich/gwas/gwas_catalog ",term," /home/ubuntu/EGRET/final_egret_v1_banovich/tables/CD_study_table.txt")
 system(command)
 ```
 
@@ -328,8 +336,17 @@ cad_tfs_degree_hard_thresh_melted <- separate(cad_tfs_degree_hard_thresh_melted,
 
 p1 <- ggplot(cad_tfs_degree_hard_thresh_melted) + geom_point(shape = 19, aes(x = reorder(indiv, -tf_diff_degree), y = tf_diff_degree, col = cellType),) + theme_classic()+ scale_color_manual(values=pallet)+ xlab("Individual") + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())  + labs(y = "Scaled TF disruption score", title = "CAD genes",col = "Cell type",shape = "TF") 
 
-p2 <- ggplot(cad_tfs_degree_hard_thresh_melted[cad_tfs_degree_hard_thresh_melted$tf_diff_degree>3,]) + geom_point(size = 3, aes(x = reorder(indiv, -tf_diff_degree), y = tf_diff_degree, col = cellType, size = cellType, shape = tf)) +  theme_classic()+ scale_color_manual(values=pallet)+ xlab("Individual") + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())  + labs(y = "Scaled TF disruption score", title = "Top (d' > 3) CAD genes",col = "Cell type",shape = "TF") 
+ggplot(cad_tfs_degree_hard_thresh_melted) + geom_violin(aes(x = cellType, y = tf_diff_degree, col = cellType),) + theme_classic()+ scale_color_manual(values=pallet)+ xlab("Individual") #+ theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())  + labs(y = "Scaled TF disruption score", title = "CAD genes",col = "Cell type",shape = "TF") 
+
+p1b <- ggplot(cad_tfs_degree_hard_thresh_melted) + geom_point(shape = 19, aes(x = reorder(indiv, -tf_diff_degree), y = tf_diff_degree, col = cellType),) + theme_classic()+ scale_color_manual(values=pallet)+ xlab("Individual") + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())  + labs(y = "Scaled TF disruption score", title = "CAD genes",col = "Cell type",shape = "TF")  + facet_grid(. ~ cellType)
+
+p2 <- ggplot(cad_tfs_degree_hard_thresh_melted[cad_tfs_degree_hard_thresh_melted$tf_diff_degree>3,]) + geom_point(size = 3, aes(x = reorder(indiv, -tf_diff_degree), y = tf_diff_degree, col = cellType, size = cellType, shape = tf)) +  theme_classic()+ scale_color_manual(values=pallet)+ xlab("Individual") + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())  + labs(y = "Scaled TF disruption score", title = "Top (d' > 3) CAD genes",col = "Cell type",shape = "TF")  
+
+p2b <- ggplot(cad_tfs_degree_hard_thresh_melted[cad_tfs_degree_hard_thresh_melted$tf_diff_degree>3,]) + geom_point(size = 2, aes(x = reorder(indiv, -tf_diff_degree), y = tf_diff_degree, col = cellType, size = cellType, shape = tf)) +  theme_classic()+ scale_color_manual(values=pallet)+ xlab("Individual") + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())  + labs(y = "Scaled TF disruption score", title = "Top (d' > 3) CAD genes",col = "Cell type",shape = "TF")  + facet_grid(. ~ cellType)
 #dev.off()
+
+
+
 
 p3 <- grid.arrange(p1 + theme(legend.position="none"), p2 + theme(legend.position="right"), nrow=1, widths = c(3,4))
 p4 <- annotate_figure(p3,top = text_grob("TF disruption scores for CAD genes", color = "black", face = "bold", size = 14))
@@ -339,6 +356,13 @@ plot(p4)
 dev.off()
 plot(p4)
 
+p3b <- grid.arrange(p1b + theme(legend.position="none"), p2b + theme(legend.position="none"), nrow=2)
+p4b <- annotate_figure(p3b,top = text_grob("TF disruption scores for CAD genes", color = "black", face = "bold", size = 14))
+
+pdf("../figures/top_d_cad_genes_facets.pdf",width = 8, height = 5)
+plot(p4b)
+dev.off()
+plot(p4b)
 
 # which individuals have the ipsc cm disruptions for ERG
 indivs_high_erg_disrup <- cad_tfs_degree_hard_thresh_melted[which((cad_tfs_degree_hard_thresh_melted$tf_diff_degree>3) & (cad_tfs_degree_hard_thresh_melted$cellType == "iPSC-CM")),c('indiv','tf_diff_degree')]
@@ -366,19 +390,29 @@ disease_test_tfs_degree_hard_thresh_melted <- separate(disease_test_tfs_degree_h
 
 p1 <- ggplot(disease_test_tfs_degree_hard_thresh_melted) + geom_point(shape = 19, aes(x = reorder(indiv, -tf_diff_degree), y = tf_diff_degree, col = cellType),) + theme_classic()+ scale_color_manual(values=pallet)+ xlab("Individual") + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())  + labs(y = "Scaled TF disruption score", title = "CD genes",col = "Cell type",shape = "TF")
 
-p2 <- ggplot(disease_test_tfs_degree_hard_thresh_melted[disease_test_tfs_degree_hard_thresh_melted$tf_diff_degree >3,]) + geom_point(size = 3, aes(x = reorder(indiv, -tf_diff_degree), y = tf_diff_degree, col = cellType, shape = tf)) +  theme_classic()+ scale_color_manual(values=pallet[3])+xlab("Individual") + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())  + labs(y = "Scaled TF disruption score", title = "Top (d' > 3) CD genes",col = "Cell type",shape = "TF") 
+p1b <- ggplot(disease_test_tfs_degree_hard_thresh_melted) + geom_point(shape = 19, aes(x = reorder(indiv, -tf_diff_degree), y = tf_diff_degree, col = cellType),) + theme_classic()+ scale_color_manual(values=pallet)+ xlab("Individual") + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())  + labs(y = "Scaled TF disruption score", title = "CD genes",col = "Cell type",shape = "TF") + facet_grid(. ~ cellType)
+
+p2 <- ggplot(disease_test_tfs_degree_hard_thresh_melted[disease_test_tfs_degree_hard_thresh_melted$tf_diff_degree >3,]) + geom_point(size = 3, aes(x = reorder(indiv, -tf_diff_degree), y = tf_diff_degree, col = cellType, shape = tf)) +  theme_classic()+ scale_color_manual(values=pallet[3])+xlab("Individual") + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())  + labs(y = "Scaled TF disruption score", title = "Top (d' > 3) CD genes",col = "Cell type",shape = "TF") + facet_grid(. ~ cellType)
+
+p2b <- ggplot(disease_test_tfs_degree_hard_thresh_melted[disease_test_tfs_degree_hard_thresh_melted$tf_diff_degree >3,]) + geom_point(size = 3, aes(x = reorder(indiv, -tf_diff_degree), y = tf_diff_degree, col = cellType, shape = tf)) +  theme_classic()+ scale_color_manual(values=pallet[3])+xlab("Individual") + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())  + labs(y = "Scaled TF disruption score", title = "Top (d' > 3) CD genes",col = "Cell type",shape = "TF") 
 
 
 p3 <- grid.arrange(p1 + theme(legend.position="right"), p2 + theme(legend.position="right"), nrow=1, widths = c(5,5))
 p4 <- annotate_figure(p3,top = text_grob("TF disruption scores for CD genes", color = "black", face = "bold", size = 14))
+
+p3b <- grid.arrange(p1b + theme(legend.position="none"), p2b + theme(legend.position="none"), nrow=2)
+p4b <- annotate_figure(p3b,top = text_grob("TF disruption scores for CD genes", color = "black", face = "bold", size = 14))
 
 pdf("../figures/top_d_cd_genes.pdf",width = 8, height = 3)
 plot(p4)
 dev.off()
 plot(p4)
 
+pdf("../figures/top_d_cd_genes_facet.pdf",width = 8, height = 5)
+plot(p4b)
+dev.off()
+plot(p4b)
 ```
-
 
 # ALPACA analysis
 
@@ -461,6 +495,7 @@ load("../alpaca/iPSC-CM_alpaca_score_table_genes.RData")
 pre_merged_alpaca_table <- merge(alpaca_score_table_LCL,alpaca_score_table_iPSC, by.x = c(1), by.y = c(1), all = FALSE)
 merged_alpaca_table <- merge(pre_merged_alpaca_table,alpaca_score_table_iPSCCM,by.x = c(1), by.y = c(1), all = FALSE)
 #save(merged_alpaca_table, file = "../alpaca/merged_alpaca_table_07302020_genes.RData")
+load("../alpaca/merged_alpaca_table_07302020_genes.RData")
 ```
 
 ## scale and plot distributions
@@ -486,7 +521,8 @@ cads_melted <- melt(cads)
 colnames(cads_melted) <- c("node","sample","alpaca_score")
 cads_melted <- separate(cads_melted, sample, c("cellType","tag", "indiv"), "_", remove = TRUE)
 
-ggplot(cads_melted) + geom_point(shape = 21, aes(x =indiv, y = (alpaca_score), col = cellType, fill = cellType, alpha = 0.1)) + theme_classic()+ scale_color_manual(values=pallet)+scale_fill_manual(values=pallet) + xlab("Individual")
+ggplot(cads_melted) + geom_point(shape = 21, aes(x =indiv, y = (alpaca_score), col = cellType, fill = cellType, alpha = 0.1)) + theme_classic()#+ scale_color_manual(values=pallet)+scale_fill_manual(values=pallet) + xlab("Individual")
+ggplot(cads_melted) + geom_violin(aes(x = cellType, y = (alpaca_score), fill = cellType, col = cellType)) + theme_classic()+ scale_fill_manual(values=pallet) + scale_color_manual(values=pallet)+ labs(y = "ALPACA score",col = "Cell type") + theme(legend.position = "none") 
 
 
 data <- merged_alpaca_table_qq_sc
@@ -498,11 +534,20 @@ cads_melted <- separate(cads_melted, sample, c("cellType","tag", "indiv"), "_", 
 
 p1 <- ggplot(cads_melted) + geom_point(size = 2,alpha = 0.4,aes(x = reorder(indiv, -alpaca_score), y = (alpaca_score), col = cellType,  shape = node)) + theme_classic()+ scale_color_manual(values=pallet)  + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())+ labs(y = "ALPACA score",col = "Cell type",shape = "TF", x= "Individual") 
 
-p2 <- annotate_figure(p1,top = text_grob("ALPACA scores for top CAD genes in iPSC-CMs", color = "black", face = "bold", size = 14))
+p1b <- ggplot(cads_melted) + geom_violin(aes(x = cellType, y = (alpaca_score), fill = cellType, col = cellType)) + theme_classic()+ scale_fill_manual(values=pallet) + scale_color_manual(values=pallet)+ labs(y = "ALPACA score",col = "Cell type") + theme(legend.position = "none") 
+
+
+p2 <- annotate_figure(p1,top = text_grob("ALPACA scores for top CAD TFs in iPSC-CMs", color = "black", face = "bold", size = 14))
+p2b <- annotate_figure(p1b,top = text_grob("Top CAD TFs in iPSC-CMs", color = "black", face = "bold", size = 14))
+
 pdf("../figures/banovich_topCAD_ipsc.pdf",width = 5, height = 3.5)
 plot(p2)
 dev.off()
 plot(p2)
+
+pdf("../figures/banovich_topCAD_ipsc_violin.pdf",width = 3.5, height = 3.5)
+plot(p2b)
+dev.off()
 ```
 
 
@@ -518,18 +563,28 @@ cds_melted <- separate(cds_melted, sample, c("cellType","tag", "indiv"), "_", re
 
 ggplot(cds_melted) + geom_point(shape = 21, aes(x =indiv, y = abs(alpaca_score), col = cellType, fill = cellType, alpha = 0.1)) + theme_classic()+ scale_color_manual(values=pallet)+scale_fill_manual(values=pallet) + xlab("Individual")
 
-high_score_nodes_cd <- unique(cds_melted[which((abs(cds_melted$alpaca_score) > 1.6) & (cds_melted$cellType == "LCL")),'node'])
+high_score_nodes_cd <- unique(cds_melted[which((abs(cds_melted$alpaca_score) > 1.7) & (cds_melted$cellType == "LCL")),'node'])
 cds <- data[which(data$node %in% high_score_nodes_cd),c(1:358)]
 cds_melted <- melt(cds)
 colnames(cds_melted) <- c("node","sample","alpaca_score")
 cds_melted <- separate(cds_melted, sample, c("cellType","tag", "indiv"), "_", remove = TRUE)
 
 p1 <- ggplot(cds_melted) + geom_point(size = 2,alpha = 0.4,aes(x = reorder(indiv, -alpaca_score), y = (alpaca_score), col = cellType,  shape = node)) + theme_classic()+ xlab("Individual")+ theme_classic()+ scale_color_manual(values=pallet)  + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())+ labs(y = "ALPACA score",color = "Cell type",shape = "TF", x= "Individual")
+
+p1b <- ggplot(cds_melted) + geom_violin(aes(x = cellType, y = (alpaca_score), fill = cellType, col = cellType)) + theme_classic()+ scale_fill_manual(values=pallet) + scale_color_manual(values=pallet)+ labs(y = "ALPACA score",col = "Cell type") + theme(legend.position = "none") 
+
+
+
 p2 <- annotate_figure(p1,top = text_grob("ALPACA scores for top CD genes in LCLs", color = "black", face = "bold", size = 14))
+p2b <- annotate_figure(p1b,top = text_grob("Top CD TFs in LCLs", color = "black", face = "bold", size = 14))
 pdf("../figures/banovich_topCD_lcl.pdf",width = 5, height = 3.5)
 plot(p2)
 dev.off()
 plot(p2)
+
+pdf("../figures/banovich_topCD_lcl_violin.pdf",width = 3.5, height = 3.5)
+plot(p2b)
+dev.off()
 ```
 
 ## Example - individuals with mutation in ERG binding site affecting expression of CSRP1
@@ -564,17 +619,117 @@ names(means_ipscCM) <- alpaca_score_table_iPSCCM$node
 write.table(names(means_ipscCM[order(-means_ipscCM)]), file = "../alpaca/means_genes_alpaca_ipsc_cm.txt", sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
 
 write.table(as.vector(alpaca_score_table_iPSCCM[order(-alpaca_score_table_iPSCCM$iPSCCM_indiv_11),1]),file = "gene_alpaca_ipsc_cm_indiv_11.txt", sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+
+write.table(as.vector(alpaca_score_table_iPSCCM[order(-alpaca_score_table_iPSCCM$iPSCCM_indiv_18),1]),file = "gene_alpaca_ipsc_cm_indiv_18.txt", sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
 ```
 
 ```{r}
 means_LCL <- rowMeans(alpaca_score_table_LCL[,c(2:120)])
 names(means_LCL) <- alpaca_score_table_LCL$node
 write.table(names(means_LCL[order(-means_LCL)]), file = "../alpaca/means_genes_alpaca_lcl.txt", sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
-write.table(as.vector(alpaca_score_table_LCL[order(-alpaca_score_table_LCL$LCL_indiv_38),1]),file = "gene_alpaca_lcl_indiv_38.txt", sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+write.table(as.vector(alpaca_score_table_LCL[order(-alpaca_score_table_LCL$LCL_indiv_18),1]),file = "gene_alpaca_lcl_indiv_18.txt", sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
 ```
 
 ```{r}
 means_ipsc <- rowMeans(alpaca_score_table_iPSC[,c(2:120)])
 names(means_ipsc) <- alpaca_score_table_iPSC$node
 write.table(names(means_ipsc[order(-means_ipsc)]), file = "../alpaca/means_genes_alpaca_ipsc.txt", sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+write.table(as.vector(alpaca_score_table_iPSC[order(-alpaca_score_table_iPSC$iPSC_indiv_18),1]),file = "gene_alpaca_ipsc_indiv_18.txt", sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+```
+
+
+plot go terms
+cat GO_indiv18_lcl.txt | tr '^M' '\n' | grep "^GO:" >formatted_GO_indiv18_lcl.txt
+cat GO_indiv18_ipsc.txt | tr '^M' '\n' | grep "^GO:" >formatted_GO_indiv18_ipsc.txt
+cat GO_indiv18_cm.txt | tr '^M' '\n' | grep "^GO:" >formatted_GO_indiv18_cm.txt
+
+```{r}
+go_cm <- read.table("../go/formatted_GO_indiv18_cm.txt", header = FALSE, sep = "\t")
+colnames(go_cm) <- c("GOTerm",	"Description",	"Pvalue",	"FDR",	"Enrichment",	"N"	,"B",	"n"	,"b",	"Genes")
+go_cm$celltype <- "CM"
+
+go_lcl <- read.table("../go/formatted_GO_indiv18_lcl.txt", header = FALSE, sep = "\t")
+colnames(go_lcl) <- c("GOTerm",	"Description",	"Pvalue",	"FDR",	"Enrichment",	"N"	,"B",	"n"	,"b",	"Genes")
+go_lcl$celltype <- "LCL"
+
+go_ipsc <- read.table("../go/formatted_GO_indiv18_ipsc.txt", header = FALSE, sep = "\t")
+colnames(go_ipsc) <- c("GOTerm",	"Description",	"Pvalue",	"FDR",	"Enrichment",	"N"	,"B",	"n"	,"b",	"Genes")
+go_ipsc$celltype <- "iPSC"
+
+go_enrich <- rbind(go_ipsc,go_lcl,go_cm)
+terms_to_plot <- read.table("../go/plot_terms", header = FALSE, sep = "\t")
+
+only_cm <- go_cm$Description[which((!(go_cm$Description %in% go_lcl$Description)) & (!(go_cm$Description %in% go_ipsc$Description)))]
+only_lcl <- go_lcl$Description[which((!(go_lcl$Description %in% go_cm$Description)) & (!(go_lcl$Description %in% go_ipsc$Description)))]
+only_ipsc <- go_ipsc$Description[which((!(go_ipsc$Description %in% go_lcl$Description)) & (!(go_ipsc$Description %in% go_cm$Description)))]
+
+bold <- read.table("../go/bold", header = FALSE, sep = "\t")
+terms_no_plot <- go_enrich$Description[which(!(go_enrich$Description %in% terms_to_plot$V1))]
+go_enrich_plot <- go_enrich[which(go_enrich$Description %in% terms_to_plot$V1),]
+go_enrich_plot$bold <- ifelse(go_enrich_plot$Description %in% bold$V1, "bold", "plain")
+go_enrich_plot$color <- 'black'
+go_enrich_plot$color[which(go_enrich_plot$Description %in% only_cm)] <- '#870E75'
+go_enrich_plot$color[which(go_enrich_plot$Description %in% only_lcl)] <- '#0BB19F'
+go_enrich_plot$color[which(go_enrich_plot$Description %in% only_ipsc)] <- '#FFBF00'
+```
+
+pallet <- c("#FFBF00",  "#870E75"  ,  "#0BB19F" )
+#amber, magenta, teal
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(ggthemes)
+library(forcats)
+```
+
+```{r}
+color <- factor(unique(go_enrich_plot[,c("Description", "color")])$color, levels = c("black","#FFBF00","#0BB19F", "#870E75"))
+go_enrich_plot$color2 <- color[match(go_enrich_plot$color, color)]
+order <- with(unique(go_enrich_plot[,c("Description", "color2")]), order(color2))
+
+#go_enrich_plot$Description <- reorder(go_enrich_plot$Description, order)
+Description <- factor(unique(go_enrich_plot[,c("Description", "color2")])$Description, levels = unique(go_enrich_plot[,c("Description", "color2")])[order,"Description"])
+go_enrich_plot$Description2 <- Description[match(go_enrich_plot$Description, Description)]
+ #
+go_enrich_plot$celltype <- factor(go_enrich_plot$celltype, levels = c("CM","LCL","iPSC"))
+
+p <- ggplot(go_enrich_plot, aes(x=-log10(Pvalue), y=Description2, colour=celltype, group = celltype, size=b)) + geom_point() + expand_limits(x=0) + labs(x="-log10(P-value)", y="GO term", colour="P value", size="Count") + theme_few() + scale_color_manual(values=pallet[c(2,3,1)]) +  facet_wrap(~celltype)
+y_labs <- ggplot_build(p)$layout$panel_params[[1]]$y$get_labels()
+#bold_vec <- ifelse(y_labs %in% bold$V1, "bold", "plain")
+col_vec <- as.vector(go_enrich_plot$color2)[match(y_labs,go_enrich_plot$Description2)]
+
+p <- p + theme(axis.text.y = element_text(colour = col_vec)) + scale_x_continuous(name="-log10(p-value)",limits=c(1, 8))
+pdf("goplot.pdf",width = 9, height = 8)
+plot(p)
+dev.off()
+```
+
+
+```{r}
+go_enrich$color <- 'black'
+go_enrich$color[which(go_enrich$Description %in% only_cm)] <- '#870E75'
+go_enrich$color[which(go_enrich$Description %in% only_lcl)] <- '#0BB19F'
+go_enrich$color[which(go_enrich$Description %in% only_ipsc)] <- '#FFBF00'
+
+color <- factor(unique(go_enrich[,c("Description", "color")])$color, levels = c("black","#FFBF00","#0BB19F", "#870E75"))
+go_enrich$color2 <- color[match(go_enrich$color, color)]
+order <- with(unique(go_enrich[,c("Description", "color2")]), order(color2))
+
+#go_enrich_plot$Description <- reorder(go_enrich_plot$Description, order)
+Description <- factor(unique(go_enrich[,c("Description", "color2")])$Description, levels = unique(go_enrich[,c("Description", "color2")])[order,"Description"])
+go_enrich$Description2 <- Description[match(go_enrich$Description, Description)]
+ #
+go_enrich$celltype <- factor(go_enrich$celltype, levels = c("CM","LCL","iPSC"))
+
+p <- ggplot(go_enrich, aes(x=-log10(Pvalue), y=Description2, colour=celltype, group = celltype, size=b)) + geom_point() + expand_limits(x=0) + labs(x="-log10(P-value)", y="GO term", colour="P value", size="Count") + theme_few() + scale_color_manual(values=pallet[c(2,3,1)]) +  facet_wrap(~celltype)
+y_labs <- ggplot_build(p)$layout$panel_params[[1]]$y$get_labels()
+#bold_vec <- ifelse(y_labs %in% bold$V1, "bold", "plain")
+col_vec <- as.vector(go_enrich$color2)[match(y_labs,go_enrich$Description2)]
+
+p <- p + theme(axis.text.y = element_text(colour = col_vec)) + scale_x_continuous(name="-log10(p-value)")
+pdf("goplot_all.pdf",width = 9, height = 16)
+plot(p)
+dev.off()
+
 ```

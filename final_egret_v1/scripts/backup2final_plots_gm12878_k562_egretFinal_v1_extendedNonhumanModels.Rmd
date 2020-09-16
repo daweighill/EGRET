@@ -35,7 +35,8 @@ chipseq_gm12878 <- "../chipseq/GM12878_remap2018_all_macs2_hg19_v1_2.bed"
 chipseq_k562 <- "../chipseq/K562_remap2018_all_macs2_hg19_v1_2.bed"
 ```
 
-# Create validation table for GM12878 - "extended version" with all QBiC models
+# Create validation table for GM12878 - "extended version"
+QBiC only all models.
 
 
 ## Load GM12878 networks into table
@@ -273,43 +274,22 @@ get_roc_for_top_x <- function(egretNum, x) {
 egret_priors <- c(1)
 numEdges <- c(10,20,30,40,50,60,70,80,90,100,110,120,130,140,150,160,170,180,190,200)
 
-egret_auc_pvals_topn_k<- data.frame()
+egret_auc_pvals_topn<- data.frame()
 
 for (p in egret_priors){
   for (x in numEdges){
     result <- get_roc_for_top_x(p,x)
     df <- data.frame(t(result), stringsAsFactors = FALSE)
-    egret_auc_pvals_topn_k <- rbind(egret_auc_pvals_topn_k,df)
+    egret_auc_pvals_topn <- rbind(egret_auc_pvals_topn,df)
   }
 }
-colnames(egret_auc_pvals_topn_k) <- c("egretNum", "name", "thresh", "nn", "np", "pandaAUC", "egretAUC", "pvalD")
-egret_auc_pvals_topn_k
-egret_auc_pvals_table_k <- egret_auc_pvals_topn_k[,c(3,4,5)]
-egret_auc_pvals_table_k$pandaAUC <- signif(as.numeric(egret_auc_pvals_topn_k$pandaAUC), digits = 5)
-egret_auc_pvals_table_k$egretAUC <- signif(as.numeric(egret_auc_pvals_topn_k$egretAUC), digits = 5)
-egret_auc_pvals_table_k$pvalue <- signif(as.numeric(egret_auc_pvals_topn_k$pval), digits = 5)
-print(xtable(egret_auc_pvals_table_k, type = "latex", digits = 5), file= "../tables/pval_table_extended_topn_k562.tex",include.rownames=FALSE)
-```
-
-Make a bar plot
-
-```{r}
-auc_improvement_table <- data.frame()
-
-edited_edges_k562 <- read.table("../outputs/edge_modifications_EGRET_allQBiCModels_k562_08172020.txt")
-colnames(edited_edges_k562) <- c("tf","gene","id","mod")
-edited_subset <- validation_table_k562[which(validation_table_k562$id %in% edited_edges_k562$id),]
-
-rocP <- roc(edited_subset$chipseq, edited_subset$panda, auc = TRUE, direction = "<")
-rocE <- roc(edited_subset$chipseq, edited_subset$egret_k562,auc = TRUE, direction = "<")
-test <- roc.test(rocP, rocE, alternative = "less", method = "delong" )
-pandaAUC <- test$estimate["AUC of roc1"]
-egretAUC <- test$estimate["AUC of roc2"]
-pval <- test$p.value
-print(paste(pandaAUC,egretAUC,pval))
- 
-auc_improvement_table <- as.data.frame(t(c("K562",((egretAUC-pandaAUC)/pandaAUC)*100,pval)))
-
+colnames(egret_auc_pvals_topn) <- c("egretNum", "name", "thresh", "nn", "np", "pandaAUC", "egretAUC", "pvalD")
+egret_auc_pvals_topn
+egret_auc_pvals_table <- egret_auc_pvals_topn[,c(3,4,5)]
+egret_auc_pvals_table$pandaAUC <- signif(as.numeric(egret_auc_pvals_topn$pandaAUC), digits = 5)
+egret_auc_pvals_table$egretAUC <- signif(as.numeric(egret_auc_pvals_topn$egretAUC), digits = 5)
+egret_auc_pvals_table$pvalue <- signif(as.numeric(egret_auc_pvals_topn$pval), digits = 5)
+print(xtable(egret_auc_pvals_table, type = "latex", digits = 5), file= "../tables/pval_table_extended_topn_k562.tex",include.rownames=FALSE)
 ```
 
 
@@ -403,49 +383,25 @@ get_roc_for_top_x <- function(egretNum, x) {
 egret_priors <- c(1)
 numEdges <- c(10,20,30,40,50,60,70,80,90,100,110,120,130,140,150,160,170,180,190,200)
 
-egret_auc_pvals_topn_g<- data.frame()
+egret_auc_pvals_topn<- data.frame()
 
 for (p in egret_priors){
   for (x in numEdges){
     result <- get_roc_for_top_x(p,x)
     df <- data.frame(t(result), stringsAsFactors = FALSE)
-    egret_auc_pvals_topn_g <- rbind(egret_auc_pvals_topn_g,df)
+    egret_auc_pvals_topn <- rbind(egret_auc_pvals_topn,df)
   }
 }
 
-colnames(egret_auc_pvals_topn_g) <- c("egretNum", "name", "topN", "nn", "np", "pandaAUC", "egretAUC", "pval")
-egret_auc_pvals_topn_g
-egret_auc_pvals_table_g <- egret_auc_pvals_topn_g[,c(3,4,5)]
-egret_auc_pvals_table_g$pandaAUC <- signif(as.numeric(egret_auc_pvals_topn_g$pandaAUC), digits = 5)
-egret_auc_pvals_table_g$egretAUC <- signif(as.numeric(egret_auc_pvals_topn_g$egretAUC), digits = 5)
-egret_auc_pvals_table_g$pvalue <- signif(as.numeric(egret_auc_pvals_topn_g$pval), digits = 5)
-print(xtable(egret_auc_pvals_table_g, type = "latex", digits = 5), file = "../tables/pval_table_extended_topn_gm12878.tex",include.rownames=FALSE,)
+colnames(egret_auc_pvals_topn) <- c("egretNum", "name", "topN", "nn", "np", "pandaAUC", "egretAUC", "pval")
+egret_auc_pvals_topn
+egret_auc_pvals_table <- egret_auc_pvals_topn[,c(3,4,5)]
+egret_auc_pvals_table$pandaAUC <- signif(as.numeric(egret_auc_pvals_topn$pandaAUC), digits = 5)
+egret_auc_pvals_table$egretAUC <- signif(as.numeric(egret_auc_pvals_topn$egretAUC), digits = 5)
+egret_auc_pvals_table$pvalue <- signif(as.numeric(egret_auc_pvals_topn$pval), digits = 5)
+print(xtable(egret_auc_pvals_table, type = "latex", digits = 5), file = "../tables/pval_table_extended_topn_gm12878.tex",include.rownames=FALSE,)
 ```
 
-
-```{r}
-edited_edges_gm12878 <- read.table("../outputs/edge_modifications_EGRET_allQBiCModels_na12878_08172020.txt")
-colnames(edited_edges_gm12878) <- c("tf","gene","id","mod")
-edited_subset_g <- validation_table_gm12878[which(validation_table_gm12878$id %in% edited_edges_gm12878$id),]
-
-rocP <- roc(edited_subset_g$chipseq, edited_subset_g$panda, auc = TRUE, direction = "<")
-rocE <- roc(edited_subset_g$chipseq, edited_subset_g$egret_GM12878,auc = TRUE, direction = "<")
-test <- roc.test(rocP, rocE, alternative = "less", method = "delong" )
-pandaAUC <- test$estimate["AUC of roc1"]
-egretAUC <- test$estimate["AUC of roc2"]
-pval <- test$p.value
-print(paste(pandaAUC,egretAUC,pval))
-  
-auc_improvement_table <- rbind(auc_improvement_table,(t(c("GM12878",((egretAUC-pandaAUC)/pandaAUC)*100,pval))))
-colnames(auc_improvement_table) <- c("Genotype","AUC_Improvement","pvalue")
-auc_improvement_table$p_round <- paste0("Delong p = ",signif(as.numeric(as.vector(auc_improvement_table$pvalue)), digits = 5))
-
-p <- ggplot(auc_improvement_table, aes(x=Genotype, y=as.numeric(as.vector(AUC_Improvement)), fill = Genotype, group = Genotype)) +geom_bar(stat="identity") + geom_text(aes(label="*"), position=position_dodge(width=0.9), vjust=-0.6)  +theme_bw() +  scale_fill_manual(values=pallet) + labs(x ="Genotype", y = "AU-ROC percentage improvement") + ylim(0,35) + theme(legend.position="none")
-
-pdf("../figures/auc_improvement_extended.pdf",width = 3.5, height = 3.5)
-plot(p)
-dev.off()
-```
 
 
 # Performance curves AUCs/AU-PRs for top35 edges
@@ -557,50 +513,82 @@ combined_table[which((combined_table$chipseq_k562 != combined_table$chipseq_gm12
 save(combined_table, file = "../outputs/combined.RData")
 ```
 
-# Cell line difference validation
-
-## Approach 1: ChIP-seq (differential binding edge comparison)
-
-Are differences in cell lines based on EGRET edge weights enriched for difference in ChIP-seq binding between cell lines
+# cell line difference validation
 
 ```{r}
-# load the combined data of GM12878 and K562, which overlaps with chipseq data for both.
-
 load("../outputs/combined.RData")
+mods_k562 <- read.table("../outputs/edge_modifications_EGRET_allQBiCModels_k562_08172020.txt", header = FALSE)
+colnames(mods_k562) <- c("tf","gene","id","mod")
+mods_gm12878 <- read.table("../outputs/edge_modifications_EGRET_allQBiCModels_na12878_08172020.txt", header = FALSE)
+colnames(mods_gm12878) <- c("tf","gene","id","mod")
 
-# calculate a difference score
-combined_table$diff_celline_egret <- abs(combined_table$egret_k562-combined_table$egret_gm12878)
+eqtls <- read.table("../inputs/eQTL_in_motif_promotor_adjacent_egene_finalEGRET_v1_06172020.txt", header = FALSE)
+colnames(eqtls) <- c("tf","gene","pos","chr","beta")
+eqtls$id <- paste0(eqtls$tf,eqtls$gene)
 
-# calculate difference in ChIP-seq binding
+bbseq <- read.table("../ase/ase_mapped_09012020.txt", header = FALSE)
+colnames(bbseq) <- c("tf","gene","pval","fdr")
+bbseq$id <- paste0(bbseq$tf,bbseq$gene)
+bbseq_signif <- bbseq[which(bbseq$fdr <= 0.1),]
+bbseq_signif$id <- paste0(bbseq_signif$tf,bbseq_signif$gene)
+
+bbseq_promotor <- read.table("../ase/ase_mapped_promotor_09032020.txt", header = FALSE)
+colnames(bbseq_promotor) <- c("gene","pval","fdr")
+bbseq_promotor_signif <- bbseq_promotor[which(bbseq_promotor$fdr <= 0.1),]
+
+
+combined_table$diff_diff_egret_k_g <- abs(combined_table$diff_k562-combined_table$diff_gm12878)
+combined_table$diff_egret_egret_k_g <- abs(combined_table$egret_k562-combined_table$egret_gm12878)
 combined_table$diff_chip_k_g <- abs(combined_table$chipseq_k562-combined_table$chipseq_gm12878)
+combined_table$edited_k <- ifelse(combined_table$id %in% mods_k562$id, 1, 0)
+combined_table$edited_g <- ifelse(combined_table$id %in% mods_gm12878$id, 1, 0)
+combined_table$eqtl <- ifelse(combined_table$id %in% eqtls$id, 1, 0)
+combined_table$bbseq_edge <- ifelse(combined_table$id %in% bbseq_signif$id, 1, 0)
+combined_table$bbseq_gene <- ifelse(combined_table$gene %in% bbseq_signif$gene, 1, 0)
+combined_table_bbseq_tested_edge <- combined_table[which(combined_table$id %in% bbseq$id),]
+combined_table$bbseq_gene_promotor <- ifelse(combined_table$gene %in% bbseq_promotor_signif$gene, 1, 0)
+combined_table_bbseq_tested_gene_promotor <- combined_table[which(combined_table$id %in% bbseq_promotor$id),]
+
+
+combined_modified <- combined_table[which(((combined_table$edited_g == 1) | (combined_table$edited_k == 1)) & ((combined_table$chipseq_gm12878 != combined_table$chipseq_k562))),]
+combined_modified2 <- combined_table[which((combined_table$edited_g == 1) | (combined_table$edited_k == 1)),]
+combined_modified3 <- combined_table[which((combined_table$eqtl == 1)),]
+combined_modified4 <- combined_table[which((combined_table$eqtl == 1) & ((combined_table$chipseq_gm12878 != combined_table$chipseq_k562))),]
+combined_modified5 <- combined_table[which((combined_table$eqtl == 1) & ((combined_table$chipseq_gm12878 != combined_table$chipseq_k562))),]
+
 
 ```
 
 
-Test if top difference edges between genotypes are enriched in diff chipseq, using a t test and a fisher test
+test if top difference edges between genotypes are enriched in diff chipseq
 ```{r}
 data <- combined_table
-mylist <- as.vector(data[order(-as.numeric(as.vector(data$diff_celline_egret))),1])
+#curve_data <- evalmod(scores = data$diff_diff_egret_k_g, labels = data$diff_chip_k_g)
+#autoplot(curve_data)
+#curve_data
+
+mylist <- as.vector(data[order(-as.numeric(as.vector(data$diff_diff_egret_k_g))),1])
 subset <- as.vector(data[which(data$diff_chip_k_g == 1),1])
 test <- TestNodeRank(mylist, subset)
 test
 
-length(mylist)
-length(subset)
+t.test(data[which(data$diff_chip_k_g == 1),]$diff_diff_egret_k_g,data[which(data$diff_chip_k_g == 0),]$diff_diff_egret_k_g, alternative="greater")
 
-t.test(data[which(data$diff_chip_k_g == 1),]$diff_celline_egret,data[which(data$diff_chip_k_g == 0),]$diff_celline_egret, alternative="greater")
+#mean(data[which(data$diff_chip_k_g == 1),]$diff_diff_egret_k_g)
+#mean(data[which(data$diff_chip_k_g == 0),]$diff_diff_egret_k_g)
 
-mean(data[which(data$diff_chip_k_g == 1),]$diff_celline_egret)
-mean(data[which(data$diff_chip_k_g == 0),]$diff_celline_egret)
+#ggplot(data[,c(1,2,3,12,13,17)], aes(x = as.factor(diff_chip_k_g), y = diff_diff_egret_k_g, color = as.factor(diff_chip_k_g), group = as.factor(diff_chip_k_g)))+ geom_boxplot() + geom_jitter(position=position_jitter(0.1))+  stat_summary(fun.y=mean, geom="point", shape=18,size=5, color="#E41A1C") + theme_bw() + scale_color_manual(values=pallet)  + theme(legend.position="right") 
 ```
 
-## Approach 2: ASE (differential gene regulation comparison)
 
-Are high difference edges enriched for ASE
+do ASE and nfkb enrichment on whole combined data, not just that whcih overlaps with chipseq
 ```{r}
-#load complete edge talbes - dont need to overlap with chipseq here
 load("../outputs/edge_table_gm12878_extended_08052020.RData")
 load("../outputs/edge_table_k562_extended_08052020.RData")
+
+bbseq_promotor <- read.table("../ase/ase_mapped_promotor_09032020.txt", header = FALSE)
+colnames(bbseq_promotor) <- c("gene","pval","fdr")
+bbseq_promotor_signif <- bbseq_promotor[which(bbseq_promotor$fdr <= 0.1),]
 
 colnames(regnet_edge_table_gm12878) <- c("id","tf","gene","panda","egret_gm12878")
 colnames(regnet_edge_table_k562) <- c("id","tf","gene","panda","egret_k562")
@@ -610,46 +598,42 @@ combined_table_all <- join(regnet_edge_table_gm12878,regnet_edge_table_k562,by =
 save(combined_table_all, file = "../outputs/combined_all.RData")
 
 load("../outputs/combined_all.RData")
-combined_table_all$diff_celline_egret <- abs(combined_table_all$diff_k-combined_table_all$diff_g)
+combined_table_all$diff_diff_egret_k_g <- abs(combined_table_all$diff_k-combined_table_all$diff_g)
+combined_table_all$diff_egret_egret_k_g <- abs(combined_table_all$egret_k562-combined_table_all$egret_gm12878)
+#combined_table_all$edited_k <- ifelse(combined_table_all$id %in% mods_k562$id, 1, 0)
+#combined_table_all$edited_g <- ifelse(combined_table_all$id %in% mods_gm12878$id, 1, 0)
+#combined_table_all$eqtl <- ifelse(combined_table_all$id %in% eqtls$id, 1, 0)
+#mark significant bbseq edges
+#combined_table_all$bbseq_edge <- ifelse(combined_table_all$id %in% bbseq_signif$id, 1, 0)
+#combined_table_all$bbseq_gene <- ifelse(combined_table_all$gene %in% bbseq_signif$gene, 1, 0)
+#narrow down to only those edges which were "testable"
+#combined_table_bbseq_tested <- combined_table_all[which(combined_table_all$id %in% bbseq$id),]
+combined_table_all$bbseq_gene_promotor <- ifelse(combined_table_all$gene %in% bbseq_promotor_signif$gene, 1, 0)
+combined_table_all_bbseq_tested_gene_promotor <- combined_table_all[which(combined_table_all$gene %in% bbseq_promotor$gene),]
 
-ase_promotor <- read.table("../ase/ase_mapped_motifs_09012020.txt", header = FALSE)
-colnames(ase_promotor) <- c("tf","gene","pval","fdr","chr","pos")
-ase_promotor$snpID <- paste0(ase_promotor$chr,"_",ase_promotor$pos)
-ase_promotor$id <- paste0(ase_promotor$tf,ase_promotor$gene)
-ase_promotor_signif <- ase_promotor[which(ase_promotor$fdr <= 0.1),]
-
-combined_table_all_ase_tested <- combined_table_all[which(combined_table_all$id %in% ase_promotor$id),]
-combined_table_all_ase_tested$ase_signif <- ifelse(combined_table_all_ase_tested$id %in% ase_promotor_signif$id, 1, 0)
-
-# aggregate by gene
-gene_ag <- aggregate(combined_table_all_ase_tested$diff_celline_egret, by = list(combined_table_all_ase_tested$gene), FUN = sum)
+gene_ag <- aggregate(combined_table_all_bbseq_tested_gene_promotor$diff_diff_egret_k_g, by = list(combined_table_all_bbseq_tested_gene_promotor$gene), FUN = sum)
 colnames(gene_ag) <- c("gene","sum_diff_k_g")
-gene_ag$ase_signif <- ifelse(gene_ag$gene %in% ase_promotor_signif$gene, 1, 0)
+gene_ag$bbseq_gene_promotor <- ifelse(gene_ag$gene %in% bbseq_promotor_signif$gene, 1, 0)
+```
 
-
-# test enrichment
+This next code chunk tells us that genes with high overall difference in disruption between two cell lines are enriched for ASE.
+```{r}
 data <- gene_ag
+
+
 mylist <- as.vector(data[order(-as.numeric(as.vector(data$sum_diff_k_g))),1])
-subset <- data[which(data$ase_signif == 1),1]
+subset <- data[which(data$bbseq_gene_promotor == 1),1]
 test <- TestNodeRank(mylist, subset)
 test
 
-length(mylist)
-length(subset)
+t.test(data[which(data$bbseq_gene_promotor == 1),]$sum_diff_k_g,data[which(data$bbseq_gene_promotor == 0),]$sum_diff_k_g, alternative="greater")
 
-t.test(data[which(data$ase_signif == 1),]$sum_diff_k_g,data[which(data$ase_signif == 0),]$sum_diff_k_g, alternative="greater")
-
-mean(data[which(data$ase_signif == 1),]$sum_diff_k_g)
-mean(data[which(data$ase_signif == 0),]$sum_diff_k_g)
-
+#mean(data[which(data$bbseq_gene == 1),]$diff_diff_egret_k_g)
+#mean(data[which(data$bbseq_gene == 0),]$diff_diff_egret_k_g)
 ```
 
 
-The reason why we enrich by gene is that the SNP overlap is very very low. The Number of SNPs which we can actually overlap with SNPs we had an actual chance of editing with overlaps by only ...... But we try to agglomerate with a gene level statistic.
-
-
-
-# Approach 3: caQTLs (differential gene regulation comparison)
+# caQTLs
 ```{r}
 # load caQTLs in motifs in promotors
 caqtl <- read.table("../caqtl/caqtl_mapped_motifs_09092020.txt", header = FALSE)
@@ -664,28 +648,15 @@ combined_table_all_caqtl_tested <- combined_table_all[which(combined_table_all$i
 # mark edges as significant caQTL or not
 combined_table_all_caqtl_tested$caqtl_signif <- ifelse(combined_table_all_caqtl_tested$id %in% caqtl_signif$edge_id, 1, 0)
 
-
-#aggregate by gene
-gene_ag <- aggregate(combined_table_all_caqtl_tested$diff_celline_egret, by = list(combined_table_all_caqtl_tested$gene), FUN = sum)
-colnames(gene_ag) <- c("gene","sum_diff_k_g")
-gene_ag$cqtl <- ifelse(gene_ag$gene %in% caqtl_signif$gene, 1, 0)
-
-mylist <- as.vector(gene_ag[order(-as.numeric(as.vector(gene_ag$sum_diff_k_g))),1])
-subset <- gene_ag[which(gene_ag$cqtl == 1),1]
+# do enrichment of qtl/not in difference score
+mylist <- as.vector(combined_table_all_caqtl_tested[order(-as.numeric(as.vector(combined_table_all_caqtl_tested$diff_diff_egret_k_g))),1])
+subset <- combined_table_all_caqtl_tested[which(combined_table_all_caqtl_tested$caqtl_signif == 1),1]
 test <- TestNodeRank(mylist, subset)
 test
 
-length(mylist)
-length(subset)
-
-t.test(gene_ag[which(gene_ag$cqtl == 1),]$sum_diff_k_g,gene_ag[which(gene_ag$cqtl == 0),]$sum_diff_k_g, alternative="greater")
-
-
 ```
 
-
-
-
+noice
 
 # Now make table of snps which contribute and are also caQTLs
 ```{r}
