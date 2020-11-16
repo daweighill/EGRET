@@ -1,0 +1,341 @@
+---
+title: "Final EGRET v1 Banovich application - Data Analysis"
+author: "Deborah Weighill"
+date: "August 3, 2020"
+output:
+  html_notebook:
+    toc: true
+    theme: cosmo
+    df_print: paged
+---
+
+```{r}
+library(dplyr)
+library(preprocessCore)
+library(ggplot2)
+library(ggpubr)
+library(reshape2)
+library(jcolors)
+library(tidyr)
+library(ALPACA)
+library(gridExtra)
+library(grid)
+library(gridExtra)
+pallet <- c(    "#FFBF00",  "#870E75"  ,  "#0BB19F" )
+```
+
+
+# Load the LCL results
+```{r echo=FALSE,results='hide'}
+load("../outputs/LCL_table_banovich_finalEgret_v1_allModels_smart1_07042020.RData")
+```
+
+```{r}
+# calculate differences
+diff_table_lcl <- regnet_edge_table_LCL
+for (i in c(1:119)){
+  diff_table_lcl[,4+i] <- abs(regnet_edge_table_LCL[,4+i]-regnet_edge_table_LCL[,4])
+}
+
+# threshold differences 0.35
+diff_table_lcl_hard_thresh <- diff_table_lcl[,c(5:123)]
+diff_table_lcl_hard_thresh[diff_table_lcl_hard_thresh < 0.35] <- 0
+diff_table_lcl_hard_thresh <- cbind(diff_table_lcl[,c(2,3)],diff_table_lcl_hard_thresh)
+
+# aggregate by tf and SAVE
+tf_degrees_hard_thresh_lcl <- aggregate(diff_table_lcl_hard_thresh[,c(3:121)], by = list(diff_table_lcl_hard_thresh$tf), FUN = sum) 
+gene_degrees_hard_thresh_lcl <- aggregate(diff_table_lcl_hard_thresh[,c(3:121)], by = list(diff_table_lcl_hard_thresh$gene), FUN = sum) 
+
+save(tf_degrees_hard_thresh_lcl, file = "../outputs/tf_degree_LCL_hardthresh_035.RData")
+save(gene_degrees_hard_thresh_lcl, file = "../outputs/gene_degree_LCL_hardthresh_035.RData")
+```
+
+## Load the iPSC results
+```{r echo=FALSE,results='hide'}
+load("../outputs/iPSC_table_banovich_finalEgret_v1_allModels_smart1_07042020.RData")
+```
+
+```{r}
+# calculate differences
+diff_table_ipsc <- regnet_edge_table_iPSC
+for (i in c(1:119)){
+  diff_table_ipsc[,4+i] <- abs(regnet_edge_table_iPSC[,4+i]-regnet_edge_table_iPSC[,4])
+}
+
+# threshold differences 0.35
+diff_table_ipsc_hard_thresh <- diff_table_ipsc[,c(5:123)]
+diff_table_ipsc_hard_thresh[diff_table_ipsc_hard_thresh < 0.35] <- 0
+diff_table_ipsc_hard_thresh <- cbind(diff_table_ipsc[,c(2,3)],diff_table_ipsc_hard_thresh)
+
+# aggregate by tf and SAVE
+tf_degrees_hard_thresh_ipsc <- aggregate(diff_table_ipsc_hard_thresh[,c(3:121)], by = list(diff_table_ipsc_hard_thresh$tf), FUN = sum) 
+gene_degrees_hard_thresh_ipsc <- aggregate(diff_table_ipsc_hard_thresh[,c(3:121)], by = list(diff_table_ipsc_hard_thresh$gene), FUN = sum) 
+
+save(tf_degrees_hard_thresh_ipsc, file = "../outputs/tf_degree_iPSC_hardthresh_035.RData")
+save(gene_degrees_hard_thresh_ipsc, file = "../outputs/gene_degree_iPSC_hardthresh_035.RData")
+```
+
+
+
+## Load the iPSC-CM results
+```{r echo=FALSE,results='hide'}
+load("../outputs/iPSC-CM_table_banovich_finalEgret_v1_allModels_smart1_07042020.RData")
+```
+
+
+```{r}
+# calculate differences
+diff_table_ipscCM <- regnet_edge_table_iPSC_CM
+for (i in c(1:119)){
+  diff_table_ipscCM[,4+i] <- abs(regnet_edge_table_iPSC_CM[,4+i]-regnet_edge_table_iPSC_CM[,4])
+}
+
+# threshold differences 0.35
+diff_table_ipscCM_hard_thresh <- diff_table_ipscCM[,c(5:123)]
+diff_table_ipscCM_hard_thresh[diff_table_ipscCM_hard_thresh < 0.35] <- 0
+diff_table_ipscCM_hard_thresh <- cbind(diff_table_ipscCM[,c(2,3)],diff_table_ipscCM_hard_thresh)
+
+# aggregate by tf and SAVE
+tf_degrees_hard_thresh_ipscCM <- aggregate(diff_table_ipscCM_hard_thresh[,c(3:121)], by = list(diff_table_ipscCM_hard_thresh$tf), FUN = sum) 
+gene_degrees_hard_thresh_ipscCM <- aggregate(diff_table_ipscCM_hard_thresh[,c(3:121)], by = list(diff_table_ipscCM_hard_thresh$gene), FUN = sum) 
+
+save(tf_degrees_hard_thresh_ipscCM, file = "../outputs/tf_degree_iPSC-CM_hardthresh_035.RData")
+save(gene_degrees_hard_thresh_ipscCM, file = "../outputs/gene_degree_iPSC-CM_hardthresh_035.RData")
+```
+
+
+## Merge into a single table with an inner join
+
+```{r}
+load("../outputs/tf_degree_iPSC_hardthresh_035.RData")
+load("../outputs/tf_degree_iPSC-CM_hardthresh_035.RData")
+load("../outputs/tf_degree_LCL_hardthresh_035.RData")
+colnames(tf_degrees_hard_thresh_lcl)[1] <- "tf"
+colnames(tf_degrees_hard_thresh_ipsc)[1] <- "tf"
+colnames(tf_degrees_hard_thresh_ipscCM)[1] <- "tf"
+pre_merged_tf_degrees <- merge(tf_degrees_hard_thresh_lcl,tf_degrees_hard_thresh_ipsc, by.x = c(1), by.y = c(1), all = FALSE)
+merged_tf_degrees <- merge(pre_merged_tf_degrees,tf_degrees_hard_thresh_ipscCM,by.x = c(1), by.y = c(1), all = FALSE)
+save(merged_tf_degrees, file = "../outputs/merged_tf_degrees_banovich_smart1_premergecalc_08032020.RData")
+```
+
+# Load gwas
+```{r}
+
+# load gene annotation to assign gene id to gene name
+nameGeneMap <- read.table("../../final_egret_v1/annotation/geneID_name_map.txt", header = FALSE)
+colnames(nameGeneMap) <- c("gene","name")
+
+RA <- read.table("../gwas/RA_gwas_parsed.txt", header = FALSE,  sep = "\t")
+colnames(RA) <- c("RAtrait","name")
+RA$gene <- nameGeneMap$gene[match(RA$name, nameGeneMap$name)]
+
+CD <- read.table("../gwas/CD_gwas_parsed.txt", header = FALSE,  sep = "\t")
+colnames(CD) <- c("CDtrait","name")
+CD$gene <- nameGeneMap$gene[match(CD$name, nameGeneMap$name)]
+
+CAD <- read.table("../gwas/CAD_gwas_parsed.txt", header = FALSE,  sep = "\t")
+colnames(CAD) <- c("CADtrait","name")
+CAD$gene <- nameGeneMap$gene[match(CAD$name, nameGeneMap$name)]
+
+BMI <- read.table("../gwas/BMI_gwas_parsed.txt", header = FALSE,  sep = "\t")
+colnames(BMI) <- c("BMItrait","name")
+BMI$gene <- nameGeneMap$gene[match(BMI$name, nameGeneMap$name)]
+
+MS <- read.table("../gwas/MS_gwas_parsed.txt", header = FALSE,  sep = "\t")
+colnames(MS) <- c("MStrait","name")
+MS$gene <- nameGeneMap$gene[match(MS$name, nameGeneMap$name)]
+
+MI <- read.table("../gwas/MI_gwas_parsed.txt", header = FALSE,  sep = "\t")
+colnames(MI) <- c("MItrait","name")
+MI$gene <- nameGeneMap$gene[match(MI$name, nameGeneMap$name)]
+```
+
+
+```{r}
+merged_tf_degrees$CAD <- ifelse(merged_tf_degrees$tf %in% CAD$name, 1,0)
+merged_tf_degrees$CD <- ifelse(merged_tf_degrees$tf %in% CD$name, 1,0)
+merged_tf_degrees_scaled <- scale(merged_tf_degrees[,c(2:358)], center = TRUE, scale = TRUE)
+merged_tf_degrees_scaled <- cbind(merged_tf_degrees[,c(1)], merged_tf_degrees_scaled, merged_tf_degrees[,c(359:360)])
+colnames(merged_tf_degrees_scaled)[1] <-"tf"
+
+tf_degrees <- merged_tf_degrees
+tf_degree_lcl <- melt(tf_degrees[,c(1,c(2:120))], id.vars = c("tf"))
+tf_degree_lcl$tissue <- "LCL"
+tf_degree_iPSC <- melt(tf_degrees[,c(1,c(121:239))], id.vars = c("tf"))
+tf_degree_iPSC$tissue <- "iPSC"
+tf_degree_iPSC_CM <- melt(tf_degrees[,c(1,c(240:358))], id.vars = c("tf"))
+tf_degree_iPSC_CM$tissue <- "iPSC-CM"
+tf_degrees_melted <- rbind(tf_degree_lcl,tf_degree_iPSC,tf_degree_iPSC_CM)
+colnames(tf_degrees_melted) <- c("tf","individual","diff_out_degree","Tissue")
+
+ggplot(tf_degrees_melted, aes(x=Tissue, y=diff_out_degree, fill=Tissue, col = Tissue)) + geom_violin() + theme_bw() + scale_fill_manual(values=pallet) + scale_color_manual(values=pallet) + labs(title="Distribution of TF Disruption Scores", x ="Cell type", y = "TF Disruption Score") + theme(legend.position="none")
+
+ggplot(tf_degrees_melted, aes(x=diff_out_degree,  color=Tissue)) + geom_density() + theme_bw() + scale_color_manual(values=pallet) +labs(title=NULL, x ="Scaled TF disruption score", y = "Frequency") +  xlim(-1, 1)
+
+ggplot(tf_degrees_melted, aes(x=diff_out_degree,  color=Tissue, fill = Tissue)) + geom_density(alpha = 0.1) + theme_bw() + scale_color_manual(values=pallet) + scale_fill_manual(values=pallet) +labs(title=NULL, x ="Scaled TF disruption score", y = "Frequency") +  xlim(0.1, 10)
+
+tf_degrees <- merged_tf_degrees_scaled
+tf_degree_lcl <- melt(tf_degrees[,c(1,c(2:120))], id.vars = c("tf"))
+tf_degree_lcl$tissue <- "LCL"
+tf_degree_iPSC <- melt(tf_degrees[,c(1,c(121:239))], id.vars = c("tf"))
+tf_degree_iPSC$tissue <- "iPSC"
+tf_degree_iPSC_CM <- melt(tf_degrees[,c(1,c(240:358))], id.vars = c("tf"))
+tf_degree_iPSC_CM$tissue <- "iPSC-CM"
+tf_degrees_melted <- rbind(tf_degree_lcl,tf_degree_iPSC,tf_degree_iPSC_CM)
+colnames(tf_degrees_melted) <- c("tf","individual","diff_out_degree","Tissue")
+
+ggplot(tf_degrees_melted, aes(x=Tissue, y=diff_out_degree, fill=Tissue, col = Tissue)) + geom_violin() + theme_bw() + scale_fill_manual(values=pallet) + scale_color_manual(values=pallet) + labs(title="Distribution of TF Disruption Scores", x ="Cell type", y = "TF Disruption Score") + theme(legend.position="none")
+
+ggplot(tf_degrees_melted, aes(x=diff_out_degree,  color=Tissue)) + geom_density() + theme_bw() + scale_color_manual(values=pallet) +labs(title=NULL, x ="Scaled TF disruption score", y = "Frequency") +  xlim(-1, 1)
+
+ggplot(tf_degrees_melted, aes(x=diff_out_degree,  color=Tissue, fill = Tissue)) + geom_density(alpha = 0.1) + theme_bw() + scale_color_manual(values=pallet) + scale_fill_manual(values=pallet) +labs(title=NULL, x ="Scaled TF disruption score", y = "Frequency") +  xlim(0.1, 10)
+
+```
+
+
+
+CAD
+```{r}
+tf_data <- merged_tf_degrees_scaled
+d = 6
+individuals <- c(2:358)
+CAD_enrich <- sapply(individuals, FUN = function(i){
+  high_diff_gwas <- length(which((tf_data[,i] >d) & (tf_data$CAD == 1)))
+  low_diff_gwas <- length(which((tf_data[,i] <=d) & (tf_data$CAD == 1)))
+  high_diff_notGwas <- length(which((tf_data[,i] >d) & (tf_data$CAD == 0)))
+  low_diff_notGwas <- length(which((tf_data[,i] <=d) & (tf_data$CAD == 0)))
+  contingency_table <- matrix(c(high_diff_gwas,low_diff_gwas,high_diff_notGwas,low_diff_notGwas), nrow = 2,dimnames = list(Diff = c("High", "Low"),GWAS = c("yes", "no")))
+  test <- fisher.test(contingency_table, alternative = "greater")
+  return(as.numeric(test$p.value))
+})
+names(CAD_enrich) <- colnames(tf_data)[individuals]
+
+cad_enriched_indiv <- names(which(CAD_enrich < 0.05))
+cad_enriched_indiv
+cad_df <- as.data.frame(CAD_enrich)
+colnames(cad_df) <- "pvalue"
+cad_df$Tissue <- NA
+cad_df$Tissue[1:119] <- "LCL"
+cad_df$Tissue[120:238] <- "iPSC"
+cad_df$Tissue[239:357] <- "iPSC-CM"
+cad_df$Individual <- NA
+cad_df$Individual <- c(c(1:119),c(1:119),c(1:119))
+
+#pdf("banovich_CAD_enrichment.pdf",width = 5, height = 3.5)
+ggplot(cad_df) + geom_point(shape = 19, aes(x = reorder(Individual, log10(pvalue)), y = -log10(pvalue), col = Tissue),) + theme_classic()+ scale_color_manual(values=pallet) + geom_abline(slope = 0, intercept = -log10(0.05), linetype = "dashed", col = "black") + xlab("Individual") + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())  + labs(y = "-log10(p-value)", title = "Enrichment of disrupted TFs in CAD genes",color = "Cell type") + annotate("text", x = 110, y = 1.4, label = "p = 0.05")
+#dev.off()
+
+```
+
+
+CAD - list enrichment
+
+```{r}
+tf_data <- merged_tf_degrees_scaled
+cad_tfs <- tf_data[which(tf_data$CAD == 1),1]
+individuals <- c(2:358)
+CAD_enrich <- sapply(individuals, FUN = function(i){
+  mylist <- as.vector(tf_data[order(-as.numeric(as.vector(tf_data[,i]))),1])
+  test <- TestNodeRank(mylist, cad_tfs)
+  return(test[3])
+})
+names(CAD_enrich) <- colnames(tf_data)[individuals]
+
+cad_enriched_indiv <- names(which(CAD_enrich < 0.05))
+cad_enriched_indiv
+cad_df <- as.data.frame(CAD_enrich)
+colnames(cad_df) <- "pvalue"
+cad_df$Tissue <- NA
+cad_df$Tissue[1:119] <- "LCL"
+cad_df$Tissue[120:238] <- "iPSC"
+cad_df$Tissue[239:357] <- "iPSC-CM"
+cad_df$Individual <- NA
+cad_df$Individual <- c(c(1:119),c(1:119),c(1:119))
+
+#pdf("banovich_CAD_enrichment.pdf",width = 5, height = 3.5)
+ggplot(cad_df) + geom_point(shape = 19, aes(x = reorder(Individual, log10(pvalue)), y = -log10(pvalue), col = Tissue),) + theme_classic()+ scale_color_manual(values=pallet) + geom_abline(slope = 0, intercept = -log10(0.05), linetype = "dashed", col = "black") + xlab("Individual") + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())  + labs(y = "-log10(p-value)", title = "Enrichment of disrupted TFs in CAD genes",color = "Cell type") + annotate("text", x = 110, y = 1.4, label = "p = 0.05")
+#dev.off()
+
+```
+
+
+
+CD
+```{r}
+tf_data <- merged_tf_degrees
+d = 6
+individuals <- c(2:358)
+CD_enrich <- sapply(individuals, FUN = function(i){
+  high_diff_gwas <- length(which((tf_data[,i] >d) & (tf_data$CD == 1)))
+  low_diff_gwas <- length(which((tf_data[,i] <=d) & (tf_data$CD == 1)))
+  high_diff_notGwas <- length(which((tf_data[,i] >d) & (tf_data$CD == 0)))
+  low_diff_notGwas <- length(which((tf_data[,i] <=d) & (tf_data$CD == 0)))
+  contingency_table <- matrix(c(high_diff_gwas,low_diff_gwas,high_diff_notGwas,low_diff_notGwas), nrow = 2,dimnames = list(Diff = c("High", "Low"),GWAS = c("yes", "no")))
+  test <- fisher.test(contingency_table, alternative = "greater")
+  return(as.numeric(test$p.value))
+})
+names(CD_enrich) <- colnames(tf_data)[individuals]
+cd_enriched_indiv <- names(which(CD_enrich < 0.05))
+cd_enriched_indiv
+
+cd_df <- as.data.frame(CD_enrich)
+colnames(cd_df) <- "pvalue"
+cd_df$Tissue <- NA
+cd_df$Tissue[1:119] <- "LCL"
+cd_df$Tissue[120:238] <- "iPSC"
+cd_df$Tissue[239:357] <- "iPSC-CM"
+cd_df$Individual <- NA
+cd_df$Individual <- c(c(1:119),c(1:119),c(1:119))
+
+#pdf("banovich_CD_enrichment.pdf",width = 5, height = 3.5)
+ggplot(cd_df) + geom_point(shape = 19, aes(x = reorder(Individual, log10(pvalue)), y = -log10(pvalue), col = Tissue),) + theme_classic()+ scale_color_manual(values=pallet) + geom_abline(slope = 0, intercept = -log10(0.05), linetype = "dashed", col = "black") + xlab("Individual") + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank()) + labs(y = "-log10(p-value)", title = "Enrichment of disrupted TFs (d > 15) in CD genes",color = "Cell type") + annotate("text", x = 110, y = 1.4, label = "p = 0.05")
+
+#dev.off()
+```
+
+
+```{r}
+tf_data <- merged_tf_degrees
+cad_tfs <- tf_data[which(tf_data$CD == 1),1]
+individuals <- c(2:358)
+CD_enrich <- sapply(individuals, FUN = function(i){
+  mylist <- as.vector(tf_data[order(-as.numeric(as.vector(tf_data[,i]))),1])
+  test <- TestNodeRank(mylist, cad_tfs)
+  return(test[3])
+})
+names(CD_enrich) <- colnames(tf_data)[individuals]
+
+cd_enriched_indiv <- names(which(CD_enrich < 0.05))
+cd_enriched_indiv
+cd_df <- as.data.frame(CD_enrich)
+colnames(cd_df) <- "pvalue"
+cd_df$Tissue <- NA
+cd_df$Tissue[1:119] <- "LCL"
+cd_df$Tissue[120:238] <- "iPSC"
+cd_df$Tissue[239:357] <- "iPSC-CM"
+cd_df$Individual <- NA
+cd_df$Individual <- c(c(1:119),c(1:119),c(1:119))
+
+#pdf("banovich_CAD_enrichment.pdf",width = 5, height = 3.5)
+ggplot(cd_df) + geom_point(shape = 19, aes(x = reorder(Individual, log10(pvalue)), y = -log10(pvalue), col = Tissue),) + theme_classic()+ scale_color_manual(values=pallet) + geom_abline(slope = 0, intercept = -log10(0.05), linetype = "dashed", col = "black") + xlab("Individual") + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())  + labs(y = "-log10(p-value)", title = "Enrichment of disrupted TFs in CAD genes",color = "Cell type") + annotate("text", x = 110, y = 1.4, label = "p = 0.05")
+#dev.off()
+
+```
+
+
+
+```{r}
+data <- merged_tf_degrees_scaled
+cad_tfs_degree_hard_thresh <- data[which(data$CAD == 1),c(1:358)]
+cad_tfs_degree_hard_thresh_melted <- melt(cad_tfs_degree_hard_thresh)
+colnames(cad_tfs_degree_hard_thresh_melted) <- c("tf","sample","tf_diff_degree")
+cad_tfs_degree_hard_thresh_melted <- separate(cad_tfs_degree_hard_thresh_melted, sample, c("cellType","tag", "indiv"), "_", remove = TRUE)
+
+ggplot(cad_tfs_degree_hard_thresh_melted) + geom_point(shape = 19, aes(x = reorder(indiv, -tf_diff_degree), y = tf_diff_degree, col = cellType),) + theme_classic()+ scale_color_manual(values=pallet)+ xlab("Individual") #+ theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())  + labs(y = "-log10(p-value)", title = "Enrichment of disrupted TFs in CAD genes",color = "Cell type") + annotate("text", x = 110, y = 1.4, label = "p = 0.05")
+#dev.off()
+
+ggplot(cad_tfs_degree_hard_thresh_melted[cad_tfs_degree_hard_thresh_melted$tf_diff_degree>2,]) + geom_point(size = 3, aes(x = reorder(indiv, -tf_diff_degree), y = tf_diff_degree, col = cellType, shape = tf)) +  theme_classic()+ scale_color_manual(values=pallet)+ xlab("Individual") + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())  + labs(y = "Scaled TF disruption score", title = "TF disruption scores for top CAD genes",col = "Cell type",shape = "TF") 
+#dev.off()
+
+
+```

@@ -1,0 +1,989 @@
+---
+title: "Plots for GM12878 and K562"
+author: "Deborah Weighill"
+date: "August 5, 2020"
+output:
+  html_notebook:
+    toc: true
+    theme: cosmo
+    df_print: paged
+---
+
+# Load libraries, preliminaries
+```{r}
+library(xtable)
+library(jcolors)
+library(precrec)
+library(gridExtra)
+library(grid)
+library(tidyr)
+library(plyr)
+library(ggpubr)
+library(dplyr)
+library(pROC)
+library(ALPACA)
+library(viridis)
+library(lemon)
+library(GenomicRanges)
+library(ggplot2)
+library(reshape2)
+library(rtracklayer)
+
+# set color pallet
+pallet <- c("#FFBF00",  "#870E75"  ,  "#0BB19F" )
+chipseq_gm12878 <- "../chipseq/GM12878_remap2018_all_macs2_hg19_v1_2.bed"
+chipseq_k562 <- "../chipseq/K562_remap2018_all_macs2_hg19_v1_2.bed"
+```
+
+# Create validation table for GM12878 - "extended version" with all QBiC models
+
+
+## Load GM12878 networks into table
+```{r echo=FALSE,results='hide'}
+load("../outputs/finalEgret_v1_na12878_eQTLs_06182020_panda.RData")
+net <- melt(regnet)
+colnames(net) = c("tf","gene","score")
+net$id <- paste0(net$tf,net$gene)
+
+regnet_edge_table_gm12878 <- data.frame(net$id)
+colnames(regnet_edge_table_gm12878) <- c("id")
+regnet_edge_table_gm12878$tf <- as.vector(net$tf)
+regnet_edge_table_gm12878$gene <- as.vector(net$gene)
+regnet_edge_table_gm12878$panda <- as.vector(net$score)
+
+#list of the file names of the rest of the networks
+files <- c("finalEgret_v1_na12878_allModels_smart1_06302020_egret.RData")
+
+#nicknames of the networks
+names <- c("egret_GM12878")
+
+for (p in c(1:1)) {
+  filename <- paste0("../outputs/",files[p])
+  netname <- names[p]
+  print(netname)
+  load(filename)
+  net <- melt(regnet)
+  colnames(net) = c("tf","gene","score")
+  net$id <- paste0(net$tf,net$gene)
+  if(all.equal(as.vector(regnet_edge_table_gm12878$id),as.vector(net$id))){
+    print(p)
+    regnet_edge_table_gm12878$tempID <- as.vector(net$score)
+    colnames(regnet_edge_table_gm12878)[colnames(regnet_edge_table_gm12878) == "tempID"] <- netname
+  }
+}
+filename <- paste0("../outputs/edge_table_gm12878_extended_08052020.RData")
+save(regnet_edge_table_gm12878, file = filename)
+```
+
+## Load ChIP-seq data for GM12878
+We load the chipseq data and make a ground truth regulatory network for validation.
+
+```{r echo=FALSE,results='hide'}
+# read in the gene annotation file with gene ranges.
+genes <- read.table("../annotation/ensembl_genes_from_ucsc.txt", header = TRUE,sep = "\t")
+genes$promotorLeft <- ifelse(genes$strand == "+", (genes$txStart + 1 - 750), (genes$txEnd-250))
+genes$promotorRight <- ifelse(genes$strand == "+", (genes$txStart + 1 + 250), (genes$txEnd+750))
+gr_genes_promotor <- GRanges(seqnames = genes$chrom, ranges = IRanges(start = genes$promotorLeft, end = genes$promotorRight), strand = NULL, mcols = genes[,13:15])
+
+# chipseq chipseq data
+gr_chipseq_gm12878 <- import(chipseq_gm12878)
+overlaps_gm12878 <- data.frame(findOverlaps(gr_chipseq_gm12878, gr_genes_promotor))
+overlaps_gm12878$tf_name <- gr_chipseq_gm12878$name[overlaps_gm12878$queryHits]
+overlaps_gm12878$gene_name <- gr_genes_promotor$mcols.name2[overlaps_gm12878$subjectHits]
+validation_regnet_gm12878 <- separate(overlaps_gm12878, tf_name, c("exp", "tf", "cell line"), "\\.")
+chipseq_regnet_gm12878 <- distinct(validation_regnet_gm12878[,c("tf","gene_name")])
+chipseq_regnet_gm12878$id <- paste0(chipseq_regnet_gm12878$tf,chipseq_regnet_gm12878$gene)
+```
+
+## Overlap egret/panda networks with ChIP-seq data and calcualte differences
+We now filter down the panda/egret networks to only include those TFs which are in the ChIP-seq data (our validation set).
+```{r echo=FALSE,results='hide'}
+filtered_net_table_gm12878 <- regnet_edge_table_gm12878[(regnet_edge_table_gm12878$tf %in% chipseq_regnet_gm12878$tf) ,]
+filtered_net_table_gm12878$chipseq <- ifelse(filtered_net_table_gm12878$id %in% chipseq_regnet_gm12878$id,1,0)
+
+filtered_net_table_gm12878$diff_egret <- abs(filtered_net_table_gm12878$egret_GM12878 - filtered_net_table_gm12878$panda)
+
+validation_table_gm12878 <- filtered_net_table_gm12878
+filename <- paste0("../outputs/validation_table_gm12878_extended_08052020.RData")
+save(validation_table_gm12878, file = filename)
+load("../outputs/validation_table_gm12878_extended_08052020.RData")
+```
+
+# Create validation table for K562 
+
+## Load K562 networks into table
+
+Load all of the PANDA/EGRET regnets
+
+```{r echo=FALSE,results='hide'}
+# panda - note - the panda network is the same file for K562 and GM12878 as there is no genotype information
+load("../outputs/finalEgret_v1_na12878_eQTLs_06182020_panda.RData")
+net <- melt(regnet)
+colnames(net) = c("tf","gene","score")
+net$id <- paste0(net$tf,net$gene)
+
+regnet_edge_table_k562 <- data.frame(net$id)
+colnames(regnet_edge_table_k562) <- c("id")
+regnet_edge_table_k562$tf <- as.vector(net$tf)
+regnet_edge_table_k562$gene <- as.vector(net$gene)
+regnet_edge_table_k562$panda <- as.vector(net$score)
+
+#list of the file names of the rest of the networks
+files <- c("finalEgret_v1_k562_allModels_smart1_07012020_egret.RData")
+
+#nicknames of the networks
+names <- c("egret_k562")
+
+for (p in c(1:1)) {
+  filename <- paste0("../outputs/",files[p])
+  netname <- names[p]
+  print(netname)
+  load(filename)
+  net <- melt(regnet)
+  colnames(net) = c("tf","gene","score")
+  net$id <- paste0(net$tf,net$gene)
+  if(all.equal(as.vector(regnet_edge_table_k562$id),as.vector(net$id))){
+    print(p)
+    regnet_edge_table_k562$tempID <- as.vector(net$score)
+    colnames(regnet_edge_table_k562)[colnames(regnet_edge_table_k562) == "tempID"] <- netname
+  }
+}
+filename <- paste0("../outputs/edge_table_k562_extended_08052020.RData")
+save(regnet_edge_table_k562, file = filename)
+```
+
+## Load ChIP-seq data for K562
+We load the chipseq data and make a ground truth regulatory network for validation.
+
+```{r echo=FALSE,results='hide'}
+gr_chipseq_k562 <- import(chipseq_k562)
+overlaps_k562 <- data.frame(findOverlaps(gr_chipseq_k562, gr_genes_promotor))
+overlaps_k562$tf_name <- gr_chipseq_k562$name[overlaps_k562$queryHits]
+overlaps_k562$gene_name <- gr_genes_promotor$mcols.name2[overlaps_k562$subjectHits]
+validation_regnet_k562 <- separate(overlaps_k562, tf_name, c("exp", "tf", "cell line"), "\\.")
+chipseq_regnet_k562 <- distinct(validation_regnet_k562[,c("tf","gene_name")])
+chipseq_regnet_k562$id <- paste0(chipseq_regnet_k562$tf,chipseq_regnet_k562$gene)
+```
+
+## Overlap egret/panda networks with ChIP-seq data and calcualte differences
+We now filter down the panda/egret networks to only include those TFs which are in the ChIP-seq data (our validation set).
+```{r echo=FALSE,results='hide'}
+filtered_net_table_k562 <- regnet_edge_table_k562[(regnet_edge_table_k562$tf %in% chipseq_regnet_k562$tf) ,]
+filtered_net_table_k562$chipseq <- ifelse(filtered_net_table_k562$id %in% chipseq_regnet_k562$id,1,0)
+filtered_net_table_k562$diff_egret <- abs(filtered_net_table_k562$egret_k562 - filtered_net_table_k562$panda)
+
+validation_table_k562 <- filtered_net_table_k562
+filename <- paste0("../outputs/validation_table_k562_extended_08052020.RData")
+save(validation_table_k562, file = filename)
+load("../outputs/validation_table_k562_extended_08052020.RData")
+```
+
+
+# Calculate performance curves and AUCs, pvals and print to latex table
+
+## K562 performance by edge disruption threshold
+```{r,results='hide',fig.show=TRUE}
+names <- c("egret_k562")
+diff_cols <- c(7)
+egret_net_nums <- c(5)
+panda_net_nums <- c(4)
+chipseq_col <- 6
+get_roc_for_diff_thresh <- function(egretNum, thresh) {
+  diffcolnum <- diff_cols[egretNum]
+  egretcol <- egret_net_nums[egretNum]
+  panda_col <- panda_net_nums[egretNum]
+  
+  top_diff_table <- validation_table_k562[(validation_table_k562[,c(diffcolnum)]>thresh),c(panda_col,egretcol,chipseq_col)]
+  scores <- join_scores(top_diff_table[,1],top_diff_table[,2])
+  labels <- join_labels(top_diff_table[,3],top_diff_table[,3])
+  specs <- paste0(names[egretNum],", thresh: ",thresh)
+  
+  rocP <- roc(top_diff_table$chipseq, top_diff_table[,1], auc = TRUE, direction = "<")
+  rocE <- roc(top_diff_table$chipseq, top_diff_table[,2],auc = TRUE, direction = "<")
+  testD <- roc.test(rocP, rocE, alternative = "less", method = "delong" )
+  pandaAUC <- testD$estimate["AUC of roc1"]
+  egretAUC <- testD$estimate["AUC of roc2"]
+  pvalD <- testD$p.value
+  print(paste(egretNum,thresh,pvalD))
+  
+  curve_data <- mmdata(scores, labels,modnames = c("panda", specs), dsids = c(1, 2))
+  curves <- evalmod(curve_data)
+  nn <- attr(curves$rocs,"data_info")$nn[1]
+  np <- attr(curves$rocs,"data_info")$np[1]
+  result <- c(egretNum, names[egretNum], thresh, nn, np, pandaAUC, egretAUC, pvalD)
+  return(result)
+  autoplot(curves)
+}
+
+egret_priors <- c(1)
+thresholds <- c(0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9,1,2,3,4)
+
+egret_auc_pvals<- data.frame()
+
+for (p in egret_priors){
+  for (t in thresholds){
+    result <- get_roc_for_diff_thresh(p,t)
+    df <- data.frame(t(result), stringsAsFactors = FALSE)
+    egret_auc_pvals <- rbind(egret_auc_pvals,df)
+  }
+}
+
+colnames(egret_auc_pvals) <- c("egretNum", "name", "thresh", "nn", "np", "pandaAUC", "egretAUC", "pvalD")
+egret_auc_pvals
+egret_auc_pvals_table <- egret_auc_pvals[,c(3,4,5)]
+egret_auc_pvals_table$pandaAUC <- signif(as.numeric(egret_auc_pvals$pandaAUC, digits = 4))
+egret_auc_pvals_table$egretAUC <- signif(as.numeric(egret_auc_pvals$egretAUC, digits = 4))
+egret_auc_pvals_table$pvalue <- signif(as.numeric(egret_auc_pvals$pvalD, digits = 4))
+print(xtable(egret_auc_pvals_table, type = "latex"), file = "../tables/pval_table_extended_thresh_k562.tex", include.rownames=FALSE)
+```
+
+## K562 performance by "top n" disrupted edges
+```{r,results='hide',fig.show=TRUE}
+names <- c("egret_k562")
+diff_cols <- c(7)
+egret_net_nums <- c(5)
+panda_net_nums <- c(4)
+chipseq_col <- 6
+get_roc_for_top_x <- function(egretNum, x) {
+  egretcol <- egret_net_nums[egretNum]
+  panda_col <- panda_net_nums[egretNum]
+  
+  top_x_table <- top_n(validation_table_k562,x,diff_egret)[,c(panda_col,egretcol,chipseq_col)] 
+  scores <- join_scores(top_x_table[,1],top_x_table[,2])
+  labels <- join_labels(top_x_table[,3],top_x_table[,3])
+  specs <- paste0(names[egretNum],", top ",x)
+  
+  rocP <- roc(top_x_table$chipseq, top_x_table[,1], auc = TRUE, direction = "<")
+  rocE <- roc(top_x_table$chipseq, top_x_table[,2],auc = TRUE, direction = "<")
+  test <- roc.test(rocP, rocE, alternative = "less", method = "delong" )
+  pandaAUC <- test$estimate["AUC of roc1"]
+  egretAUC <- test$estimate["AUC of roc2"]
+  pval <- test$p.value
+  print(paste(egretNum,x,pval))
+  
+  curve_data <- mmdata(scores, labels,modnames = c("panda", specs), dsids = c(1, 2))
+  curves <- evalmod(curve_data)
+  nn <- attr(curves$rocs,"data_info")$nn[1]
+  np <- attr(curves$rocs,"data_info")$np[1]
+  result <- c(egretNum, names[egretNum], x, nn, np, pandaAUC, egretAUC, pval)
+  return(result)
+  autoplot(curves)
+}
+
+egret_priors <- c(1)
+numEdges <- c(10,20,30,40,50,60,70,80,90,100,110,120,130,140,150,160,170,180,190,200)
+
+egret_auc_pvals_topn_k<- data.frame()
+
+for (p in egret_priors){
+  for (x in numEdges){
+    result <- get_roc_for_top_x(p,x)
+    df <- data.frame(t(result), stringsAsFactors = FALSE)
+    egret_auc_pvals_topn_k <- rbind(egret_auc_pvals_topn_k,df)
+  }
+}
+colnames(egret_auc_pvals_topn_k) <- c("egretNum", "name", "thresh", "nn", "np", "pandaAUC", "egretAUC", "pvalD")
+egret_auc_pvals_topn_k
+egret_auc_pvals_table_k <- egret_auc_pvals_topn_k[,c(3,4,5)]
+egret_auc_pvals_table_k$pandaAUC <- signif(as.numeric(egret_auc_pvals_topn_k$pandaAUC), digits = 5)
+egret_auc_pvals_table_k$egretAUC <- signif(as.numeric(egret_auc_pvals_topn_k$egretAUC), digits = 5)
+egret_auc_pvals_table_k$pvalue <- signif(as.numeric(egret_auc_pvals_topn_k$pval), digits = 5)
+print(xtable(egret_auc_pvals_table_k, type = "latex", digits = 5), file= "../tables/pval_table_extended_topn_k562.tex",include.rownames=FALSE)
+```
+
+Make a bar plot
+
+```{r}
+auc_improvement_table <- data.frame()
+
+edited_edges_k562 <- read.table("../outputs/edge_modifications_EGRET_allQBiCModels_k562_08172020.txt")
+colnames(edited_edges_k562) <- c("tf","gene","id","mod")
+edited_subset <- validation_table_k562[which(validation_table_k562$id %in% edited_edges_k562$id),]
+
+rocP <- roc(edited_subset$chipseq, edited_subset$panda, auc = TRUE, direction = "<")
+rocE <- roc(edited_subset$chipseq, edited_subset$egret_k562,auc = TRUE, direction = "<")
+test <- roc.test(rocP, rocE, alternative = "less", method = "delong" )
+pandaAUC <- test$estimate["AUC of roc1"]
+egretAUC <- test$estimate["AUC of roc2"]
+pval <- test$p.value
+print(paste(pandaAUC,egretAUC,pval))
+ 
+auc_improvement_table <- as.data.frame(t(c("K562",((egretAUC-pandaAUC)/pandaAUC)*100,pval)))
+
+```
+
+
+## GM12878 performance by edge disruption threshold
+```{r,results='hide',fig.show=TRUE}
+names <- c("egret_GM12878")
+diff_cols <- c(7)
+egret_net_nums <- c(5)
+panda_net_nums <- c(4)
+chipseq_col <- 6
+get_roc_for_diff_thresh <- function(egretNum, thresh) {
+  diffcolnum <- diff_cols[egretNum]
+  egretcol <- egret_net_nums[egretNum]
+  panda_col <- panda_net_nums[egretNum]
+  
+  top_diff_table <- validation_table_gm12878[(validation_table_gm12878[,c(diffcolnum)]>thresh),c(panda_col,egretcol,chipseq_col)]
+  scores <- join_scores(top_diff_table[,1],top_diff_table[,2])
+  labels <- join_labels(top_diff_table[,3],top_diff_table[,3])
+  specs <- paste0(names[egretNum],", thresh: ",thresh)
+  
+  rocP <- roc(top_diff_table$chipseq, top_diff_table[,1], auc = TRUE, direction = "<")
+  rocE <- roc(top_diff_table$chipseq, top_diff_table[,2],auc = TRUE, direction = "<")
+  test <- roc.test(rocP, rocE, alternative = "less", method = "delong" )
+  pandaAUC <- test$estimate["AUC of roc1"]
+  egretAUC <- test$estimate["AUC of roc2"]
+  pval <- test$p.value
+  print(paste(egretNum,thresh,pval))
+  
+  curve_data <- mmdata(scores, labels,modnames = c("panda", specs), dsids = c(1, 2))
+  curves <- evalmod(curve_data)
+  nn <- attr(curves$rocs,"data_info")$nn[1]
+  np <- attr(curves$rocs,"data_info")$np[1]
+  result <- c(egretNum, names[egretNum], thresh, nn, np, pandaAUC, egretAUC, pval)
+  return(result)
+  autoplot(curves)
+}
+
+egret_priors <- c(1)
+thresholds <- c(0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9,1,2,3,4)
+
+egret_auc_pvals<- data.frame()
+
+for (p in egret_priors){
+  for (t in thresholds){
+    result <- get_roc_for_diff_thresh(p,t)
+    df <- data.frame(t(result), stringsAsFactors = FALSE)
+    egret_auc_pvals <- rbind(egret_auc_pvals,df)
+  }
+}
+
+colnames(egret_auc_pvals) <- c("egretNum", "name", "thresh", "nn", "np", "pandaAUC", "egretAUC", "pval")
+egret_auc_pvals
+print(xtable(egret_auc_pvals[,c(3:8)], type = "latex"), file = "../tables/pval_table_extended_thresh_gm12878.tex",include.rownames=FALSE)
+```
+
+## GM12878 performance by "top n" disrupted edges
+
+```{r,results='hide',fig.show=TRUE}
+
+names <- c("egret_GM12878")
+diff_cols <- c(7)
+egret_net_nums <- c(5)
+panda_net_nums <- c(4)
+chipseq_col <- 6
+get_roc_for_top_x <- function(egretNum, x) {
+  egretcol <- egret_net_nums[egretNum]
+  panda_col <- panda_net_nums[egretNum]
+  
+  top_x_table <- top_n(validation_table_gm12878,x,diff_egret)[,c(panda_col,egretcol,chipseq_col)] 
+  scores <- join_scores(top_x_table[,1],top_x_table[,2])
+  labels <- join_labels(top_x_table[,3],top_x_table[,3])
+  specs <- paste0(names[egretNum],", top ",x)
+  
+  rocP <- roc(top_x_table$chipseq, top_x_table[,1], auc = TRUE, direction = "<")
+  rocE <- roc(top_x_table$chipseq, top_x_table[,2],auc = TRUE, direction = "<")
+  test <- roc.test(rocP, rocE, alternative = "less", method = "delong" )
+  pandaAUC <- test$estimate["AUC of roc1"]
+  egretAUC <- test$estimate["AUC of roc2"]
+  pval <- test$p.value
+  print(paste(egretNum,x,pval))
+  
+  curve_data <- mmdata(scores, labels,modnames = c("panda", specs), dsids = c(1, 2))
+  curves <- evalmod(curve_data)
+  nn <- attr(curves$rocs,"data_info")$nn[1]
+  np <- attr(curves$rocs,"data_info")$np[1]
+  result <- c(egretNum, names[egretNum], x, nn, np, pandaAUC, egretAUC, pval)
+  return(result)
+  autoplot(curves)
+}
+
+egret_priors <- c(1)
+numEdges <- c(10,20,30,40,50,60,70,80,90,100,110,120,130,140,150,160,170,180,190,200)
+
+egret_auc_pvals_topn_g<- data.frame()
+
+for (p in egret_priors){
+  for (x in numEdges){
+    result <- get_roc_for_top_x(p,x)
+    df <- data.frame(t(result), stringsAsFactors = FALSE)
+    egret_auc_pvals_topn_g <- rbind(egret_auc_pvals_topn_g,df)
+  }
+}
+
+colnames(egret_auc_pvals_topn_g) <- c("egretNum", "name", "topN", "nn", "np", "pandaAUC", "egretAUC", "pval")
+egret_auc_pvals_topn_g
+egret_auc_pvals_table_g <- egret_auc_pvals_topn_g[,c(3,4,5)]
+egret_auc_pvals_table_g$pandaAUC <- signif(as.numeric(egret_auc_pvals_topn_g$pandaAUC), digits = 5)
+egret_auc_pvals_table_g$egretAUC <- signif(as.numeric(egret_auc_pvals_topn_g$egretAUC), digits = 5)
+egret_auc_pvals_table_g$pvalue <- signif(as.numeric(egret_auc_pvals_topn_g$pval), digits = 5)
+print(xtable(egret_auc_pvals_table_g, type = "latex", digits = 5), file = "../tables/pval_table_extended_topn_gm12878.tex",include.rownames=FALSE,)
+```
+
+
+```{r}
+edited_edges_gm12878 <- read.table("../outputs/edge_modifications_EGRET_allQBiCModels_na12878_08172020.txt")
+colnames(edited_edges_gm12878) <- c("tf","gene","id","mod")
+edited_subset_g <- validation_table_gm12878[which(validation_table_gm12878$id %in% edited_edges_gm12878$id),]
+
+rocP <- roc(edited_subset_g$chipseq, edited_subset_g$panda, auc = TRUE, direction = "<")
+rocE <- roc(edited_subset_g$chipseq, edited_subset_g$egret_GM12878,auc = TRUE, direction = "<")
+test <- roc.test(rocP, rocE, alternative = "less", method = "delong" )
+pandaAUC <- test$estimate["AUC of roc1"]
+egretAUC <- test$estimate["AUC of roc2"]
+pval <- test$p.value
+print(paste(pandaAUC,egretAUC,pval))
+  
+auc_improvement_table <- rbind(auc_improvement_table,(t(c("GM12878",((egretAUC-pandaAUC)/pandaAUC)*100,pval))))
+colnames(auc_improvement_table) <- c("Genotype","AUC_Improvement","pvalue")
+auc_improvement_table$p_round <- paste0("Delong p = ",signif(as.numeric(as.vector(auc_improvement_table$pvalue)), digits = 5))
+
+p <- ggplot(auc_improvement_table, aes(x=Genotype, y=as.numeric(as.vector(AUC_Improvement)), fill = Genotype, group = Genotype)) +geom_bar(stat="identity") + geom_text(aes(label="*"), position=position_dodge(width=0.9), vjust=-0.6)  +theme_bw() +  scale_fill_manual(values=pallet) + labs(x ="Genotype", y = "AU-ROC percentage improvement") + ylim(0,35) + theme(legend.position="none")
+
+pdf("../figures/auc_improvement_extended.pdf",width = 3.5, height = 3.5)
+plot(p)
+dev.off()
+```
+
+
+# Performance curves AUCs/AU-PRs for top35 edges
+```{r}
+pallet <- c("#870E75"  ,  "#0BB19F" )
+top_x_table_gm12878 <- top_n(validation_table_gm12878, 130, diff_egret)[,c(4,5,6)]
+scores <- join_scores(top_x_table_gm12878[,1],top_x_table_gm12878[,2])
+labels <- join_labels(top_x_table_gm12878[,3],top_x_table_gm12878[,3])
+curve_data <- mmdata(scores, labels,modnames = c("panda", "egret"))
+curves <- evalmod(curve_data)
+
+rocP <- roc(top_x_table_gm12878$chipseq, top_x_table_gm12878$panda, auc = TRUE, direction = "<")
+rocE <- roc(top_x_table_gm12878$chipseq, top_x_table_gm12878$egret_GM12878,auc = TRUE, direction = "<")
+test <- roc.test(rocP, rocE, alternative = "less", method = "delong" )
+pandaAUC <- test$estimate["AUC of roc1"]
+egretAUC <- test$estimate["AUC of roc2"]
+pval <- round(test$p.value,digits = 4)
+
+pandaROC <- as.data.frame(curves$rocs[[1]]$x)
+colnames(pandaROC) <- c("x")
+pandaROC$y <- curves$rocs[[1]]$y
+pandaROC$Method <- "PANDA"
+
+egretROC <- as.data.frame(curves$rocs[[2]]$x)
+colnames(egretROC) <- c("x")
+egretROC$y <- curves$rocs[[2]]$y
+egretROC$Method <- "EGRET"
+
+roc_data <- rbind(pandaROC, egretROC)
+roccurves_gm12878 <- ggplot(roc_data, aes(x=x, y=y, color=Method, group = Method)) + geom_line() +  theme_bw() + scale_color_manual(values=pallet) + xlim(0,1) + ylim(0,1) + geom_abline(intercept = 0, slope = 1, linetype = 2) + labs(title="ROC (GM12878)", x ="1 - Specificity", y = "Sensitivity") + annotate("text", x = 0.3, y = 0.8, label = paste0("Delong p: ",pval)) 
+
+
+pandaPR <- as.data.frame(curves$prcs[[1]]$x)
+colnames(pandaPR) <- c("x")
+pandaPR$y <- curves$prcs[[1]]$y
+pandaPR$Method <- "PANDA"
+
+egretPR <- as.data.frame(curves$prcs[[2]]$x)
+colnames(egretPR) <- c("x")
+egretPR$y <- curves$prcs[[2]]$y
+egretPR$Method <- "EGRET"
+
+pr_data <- rbind(pandaPR, egretPR)
+prcurves_gm12878 <- ggplot(pr_data, aes(x=x, y=y, color=Method, group = Method)) + geom_line() +  theme_bw() + scale_color_manual(values=pallet) + xlim(0,1) + ylim(0,1) + labs(title="PR (GM12878)", x ="Recall", y = "Precision") 
+```
+
+
+```{r}
+top_x_table_k562 <- top_n(validation_table_k562, 130, diff_egret)[,c(4,5,6)]
+scores <- join_scores(top_x_table_k562[,1],top_x_table_k562[,2])
+labels <- join_labels(top_x_table_k562[,3],top_x_table_k562[,3])
+curve_data <- mmdata(scores, labels,modnames = c("panda", "egret"))
+curves <- evalmod(curve_data)
+#autoplot(curves)
+#curves
+#auc(curves)
+
+rocP <- roc(top_x_table_k562$chipseq, top_x_table_k562$panda, auc = TRUE, direction = "<")
+rocE <- roc(top_x_table_k562$chipseq, top_x_table_k562$egret_k562,auc = TRUE, direction = "<")
+test <- roc.test(rocP, rocE, alternative = "less", method = "delong" )
+pandaAUC <- test$estimate["AUC of roc1"]
+egretAUC <- test$estimate["AUC of roc2"]
+pval <- round(test$p.value,digits = 4)
+
+pandaROC <- as.data.frame(curves$rocs[[1]]$x)
+colnames(pandaROC) <- c("x")
+pandaROC$y <- curves$rocs[[1]]$y
+pandaROC$Method <- "PANDA"
+
+egretROC <- as.data.frame(curves$rocs[[2]]$x)
+colnames(egretROC) <- c("x")
+egretROC$y <- curves$rocs[[2]]$y
+egretROC$Method <- "EGRET"
+
+roc_data <- rbind(pandaROC, egretROC)
+roccurves_k562 <- ggplot(roc_data, aes(x=x, y=y, color=Method, group = Method)) + geom_line() +  theme_bw() + scale_color_manual(values=pallet) + xlim(0,1) + ylim(0,1) + geom_abline(intercept = 0, slope = 1, linetype = 2) + labs(title="ROC (K562)", x ="1 - Specificity", y = "Sensitivity") +annotate("text", x = 0.25, y = 0.8, label = paste0("Delong p: ",pval))
+
+
+pandaPR <- as.data.frame(curves$prcs[[1]]$x)
+colnames(pandaPR) <- c("x")
+pandaPR$y <- curves$prcs[[1]]$y
+pandaPR$Method <- "PANDA"
+
+egretPR <- as.data.frame(curves$prcs[[2]]$x)
+colnames(egretPR) <- c("x")
+egretPR$y <- curves$prcs[[2]]$y
+egretPR$Method <- "EGRET"
+
+pr_data <- rbind(pandaPR, egretPR)
+prcurves_k562 <- ggplot(pr_data, aes(x=x, y=y, color=Method, group = Method)) + geom_line() +  theme_bw() + scale_color_manual(values=pallet) + xlim(0,1) + ylim(0,1) + labs(title="PR (K562)", x ="Recall", y = "Precision") 
+```
+
+```{r}
+p3 <- grid.arrange(roccurves_gm12878 + theme(legend.position="hidden"), prcurves_gm12878 + theme(legend.position="none"),roccurves_k562 + theme(legend.position="hidden"), prcurves_k562 + theme(legend.position="none"), nrow=2, widths = c(4,4),heights = c(4,4))
+
+p4 <- annotate_figure(p3,top = text_grob("Performance curves for top 130 disrupted edges", color = "black", face = "bold", size = 14))
+pdf("../figures/performance_curves_top130_extended.pdf",width = 6, height = 4)
+plot(p4)
+dev.off()
+```
+
+# Select examples for visualizing in genome browser
+
+```{r}
+colnames(validation_table_gm12878) <- c("id","tf","gene","panda","egret_gm12878","chipseq_gm12878","diff_gm12878")
+colnames(validation_table_k562) <- c("id","tf","gene","panda","egret_k562","chipseq_k562","diff_k562")
+combined_table <- join(validation_table_gm12878,validation_table_k562,by = c("id","tf","gene"),type="inner")
+combined_table[which((combined_table$chipseq_k562 != combined_table$chipseq_gm12878) & (combined_table$diff_k562 > 0.5)),c(1:11)]
+save(combined_table, file = "../outputs/combined.RData")
+```
+
+# Cell line difference validation
+
+## Approach 1: ChIP-seq (differential binding edge comparison)
+
+Are differences in cell lines based on EGRET edge weights enriched for difference in ChIP-seq binding between cell lines
+
+```{r}
+# load the combined data of GM12878 and K562, which overlaps with chipseq data for both.
+
+load("../outputs/combined.RData")
+
+# calculate a difference score
+combined_table$diff_celline_egret <- abs(combined_table$egret_k562-combined_table$egret_gm12878)
+
+# calculate difference in ChIP-seq binding
+combined_table$diff_chip_k_g <- abs(combined_table$chipseq_k562-combined_table$chipseq_gm12878)
+
+```
+
+
+Test if top difference edges between genotypes are enriched in diff chipseq, using a t test and a fisher test
+```{r}
+data <- combined_table
+mylist <- as.vector(data[order(-as.numeric(as.vector(data$diff_celline_egret))),1])
+subset <- as.vector(data[which(data$diff_chip_k_g == 1),1])
+test <- TestNodeRank(mylist, subset)
+test
+
+length(mylist)
+length(subset)
+
+t.test(data[which(data$diff_chip_k_g == 1),]$diff_celline_egret,data[which(data$diff_chip_k_g == 0),]$diff_celline_egret, alternative="greater")
+
+mean(data[which(data$diff_chip_k_g == 1),]$diff_celline_egret)
+mean(data[which(data$diff_chip_k_g == 0),]$diff_celline_egret)
+```
+
+## Approach 2: ASE (differential gene regulation comparison)
+
+Are high difference edges enriched for ASE
+```{r}
+#load complete edge talbes - dont need to overlap with chipseq here
+load("../outputs/edge_table_gm12878_extended_08052020.RData")
+load("../outputs/edge_table_k562_extended_08052020.RData")
+
+colnames(regnet_edge_table_gm12878) <- c("id","tf","gene","panda","egret_gm12878")
+colnames(regnet_edge_table_k562) <- c("id","tf","gene","panda","egret_k562")
+regnet_edge_table_gm12878$diff_g <- abs(regnet_edge_table_gm12878$panda-regnet_edge_table_gm12878$egret_gm12878)
+regnet_edge_table_k562$diff_k <- abs(regnet_edge_table_k562$panda-regnet_edge_table_k562$egret_k562)
+combined_table_all <- join(regnet_edge_table_gm12878,regnet_edge_table_k562,by = c("id","tf","gene"),type="inner")
+save(combined_table_all, file = "../outputs/combined_all.RData")
+
+load("../outputs/combined_all.RData")
+combined_table_all$diff_celline_egret <- abs(combined_table_all$diff_k-combined_table_all$diff_g)
+
+ase_promotor <- read.table("../ase/ase_mapped_motifs_09012020.txt", header = FALSE)
+colnames(ase_promotor) <- c("tf","gene","pval","fdr","chr","pos")
+ase_promotor$snpID <- paste0(ase_promotor$chr,"_",ase_promotor$pos)
+ase_promotor$id <- paste0(ase_promotor$tf,ase_promotor$gene)
+ase_promotor_signif <- ase_promotor[which(ase_promotor$fdr <= 0.1),]
+
+combined_table_all_ase_tested <- combined_table_all[which(combined_table_all$id %in% ase_promotor$id),]
+combined_table_all_ase_tested$ase_signif <- ifelse(combined_table_all_ase_tested$id %in% ase_promotor_signif$id, 1, 0)
+
+# aggregate by gene
+gene_ag <- aggregate(combined_table_all_ase_tested$diff_celline_egret, by = list(combined_table_all_ase_tested$gene), FUN = sum)
+colnames(gene_ag) <- c("gene","sum_diff_k_g")
+gene_ag$ase_signif <- ifelse(gene_ag$gene %in% ase_promotor_signif$gene, 1, 0)
+
+
+# test enrichment
+data <- gene_ag
+mylist <- as.vector(data[order(-as.numeric(as.vector(data$sum_diff_k_g))),1])
+subset <- data[which(data$ase_signif == 1),1]
+test <- TestNodeRank(mylist, subset)
+test
+
+length(mylist)
+length(subset)
+
+t.test(data[which(data$ase_signif == 1),]$sum_diff_k_g,data[which(data$ase_signif == 0),]$sum_diff_k_g, alternative="greater")
+
+mean(data[which(data$ase_signif == 1),]$sum_diff_k_g)
+mean(data[which(data$ase_signif == 0),]$sum_diff_k_g)
+
+```
+
+
+The reason why we enrich by gene is that the SNP overlap is very very low. The Number of SNPs which we can actually overlap with SNPs we had an actual chance of editing with overlaps by only ...... But we try to agglomerate with a gene level statistic.
+
+
+
+# Approach 3: caQTLs (differential gene regulation comparison)
+```{r}
+# load caQTLs in motifs in promotors
+caqtl <- read.table("../caqtl/caqtl_mapped_motifs_09092020.txt", header = FALSE)
+colnames(caqtl) <- c("query","subject","tf","gene","chrom","pos","pval")
+caqtl$snpID <- paste0(caqtl$chrom,"_",caqtl$pos)
+caqtl$edge_id <- paste0(caqtl$tf,caqtl$gene)
+caqtl_signif <- caqtl[which(caqtl$pval < 1e-5),]
+
+# subset combined g/k edges to those which are tested for caQTLs
+combined_table_all_caqtl_tested <- combined_table_all[which(combined_table_all$id %in% caqtl$edge_id),]
+
+# mark edges as significant caQTL or not
+combined_table_all_caqtl_tested$caqtl_signif <- ifelse(combined_table_all_caqtl_tested$id %in% caqtl_signif$edge_id, 1, 0)
+
+
+#aggregate by gene
+gene_ag <- aggregate(combined_table_all_caqtl_tested$diff_celline_egret, by = list(combined_table_all_caqtl_tested$gene), FUN = sum)
+colnames(gene_ag) <- c("gene","sum_diff_k_g")
+gene_ag$cqtl <- ifelse(gene_ag$gene %in% caqtl_signif$gene, 1, 0)
+
+mylist <- as.vector(gene_ag[order(-as.numeric(as.vector(gene_ag$sum_diff_k_g))),1])
+subset <- gene_ag[which(gene_ag$cqtl == 1),1]
+test <- TestNodeRank(mylist, subset)
+test
+
+length(mylist)
+length(subset)
+
+t.test(gene_ag[which(gene_ag$cqtl == 1),]$sum_diff_k_g,gene_ag[which(gene_ag$cqtl == 0),]$sum_diff_k_g, alternative="greater")
+
+
+```
+
+
+
+
+
+# Now make table of snps which contribute and are also caQTLs
+```{r}
+# load GM12878 SNPs
+snps_g <- read.table("../outputs/edge_modifications_SNPsEGRET_allQBiCModels_na12878_08172020.txt")
+colnames(snps_g) <- c("tf"  ,  "gene"  ,  "snpPos" ,  "chr" ,   "effect",  "snpID", "alt_allele_count", "edgeE","qtlTF" , "qbicEffectSize", "qbicEffect" ,"absQbicEffectSize", "absQtlQffect_altAlleleCount_qbicEffect")
+snps_g$edge_id <- paste0(snps_g$tf,snps_g$gene)
+
+# load K562 SNPs
+snps_k <- read.table("../outputs/edge_modifications_SNPsEGRET_allQBiCModels_k562_08172020.txt")
+colnames(snps_k) <- c("tf"  ,  "gene"  ,  "snpPos" ,  "chr" ,   "effect",  "snpID", "alt_allele_count", "edgeE","qtlTF" , "qbicEffectSize", "qbicEffect" ,"absQbicEffectSize", "absQtlQffect_altAlleleCount_qbicEffect")
+snps_k$edge_id <- paste0(snps_k$tf,snps_k$gene)
+
+caqtl <- read.table("../caqtl/cht_results_full_LCL.txt", header = TRUE)
+caqtl$snp_id <- paste0(caqtl$TEST.SNP.CHROM,"_",caqtl$TEST.SNP.POS)
+caqtl_signif <- caqtl[which(caqtl$P.VALUE < 1e-5),]
+
+caqtl_k <- snps_k[which(snps_k$snpID %in% caqtl_signif$snp_id),]
+caqtl_k$diffscore <- combined_table_all$diff_egret_egret_k_g[match(caqtl_k$edge_id,combined_table_all$id)]
+caqtl_g <- snps_g[which(snps_g$snpID %in% caqtl_signif$snp_id),]
+caqtl_g$diffscore <- combined_table_all$diff_egret_egret_k_g[match(caqtl_g$edge_id,combined_table_all$id)]
+
+
+caqtl_k
+caqtl_g
+
+# annotate edges in table
+combined_table_all$caqtl_k <- ifelse(combined_table_all$id %in% caqtl_k$edge_id,1,0)
+combined_table_all$caqtl_g <- ifelse(combined_table_all$id %in% caqtl_g$edge_id,1,0)
+```
+
+# ASB
+Load ASB SNPs, see if any overlap with SNPs that affect priors
+
+```{r}
+# load ASB
+asb_snps <- read.table("../ase/asb_mapped_promotor_09042020.txt", header = FALSE)
+colnames(asb_snps) <- c("query","subject","gene","fdr","pval","chr","pos")
+asb_snps$id <- paste0(asb_snps$chr,"_",asb_snps$pos)
+asb_snps_signif <- asb_snps[which(asb_snps$fdr < 0.1),]
+
+# load GM12878 SNPs
+snps_g <- read.table("../outputs/edge_modifications_SNPsEGRET_allQBiCModels_na12878_08172020.txt")
+colnames(snps_g) <- c("tf"  ,  "gene"  ,  "snpPos" ,  "chr" ,   "effect",  "snpID", "alt_allele_count", "edgeE","qtlTF" , "qbicEffectSize", "qbicEffect" ,"absQbicEffectSize", "absQtlQffect_altAlleleCount_qbicEffect")
+snps_g$edge_id <- paste0(snps_g$tf,snps_g$gene)
+
+# load K562 SNPs
+snps_k <- read.table("../outputs/edge_modifications_SNPsEGRET_allQBiCModels_k562_08172020.txt")
+colnames(snps_k) <- c("tf"  ,  "gene"  ,  "snpPos" ,  "chr" ,   "effect",  "snpID", "alt_allele_count", "edgeE","qtlTF" , "qbicEffectSize", "qbicEffect" ,"absQbicEffectSize", "absQtlQffect_altAlleleCount_qbicEffect")
+snps_k$edge_id <- paste0(snps_k$tf,snps_k$gene)
+
+# overlap asb snps with k562 and gm12878 snps
+asb_k <- snps_k[which(snps_k$snpID %in% asb_snps_signif$id),]
+asb_g <- snps_g[which(snps_g$snpID %in% asb_snps_signif$id),]
+
+caqtl_k <- snps_k[which(snps_k$snpID %in% caqtl_signif$snp_id),]
+caqtl_k$diffscore <- combined_table_all$diff_egret_egret_k_g[match(caqtl_k$edge_id,combined_table_all$id)]
+caqtl_g <- snps_g[which(snps_g$snpID %in% caqtl_signif$snp_id),]
+caqtl_g$diffscore <- combined_table_all$diff_egret_egret_k_g[match(caqtl_g$edge_id,combined_table_all$id)]
+
+
+caqtl_k
+caqtl_g
+
+# annotate edges in table
+combined_table_all$asb_k_snp <- ifelse(combined_table_all$id %in% asb_k$edge_id,1,0)
+combined_table_all$asb_g_snp <- ifelse(combined_table_all$id %in% asb_g$edge_id,1,0)
+
+combined_table_all$caqtl_k <- ifelse(combined_table_all$id %in% caqtl_k$edge_id,1,0)
+combined_table_all$caqtl_g <- ifelse(combined_table_all$id %in% caqtl_g$edge_id,1,0)
+
+
+combined_table_all[which(combined_table_all$asb_k_snp != 0),c(2,3,4,5,6,7,8,9)]
+
+caqtl <- read.table("../caqtl/cht_results_full_LCL.txt", header = TRUE)
+caqtl$snp_id <- paste0(caqtl$TEST.SNP.CHROM,"_",caqtl$TEST.SNP.POS)
+caqtl_signif <- caqtl[which(caqtl$P.VALUE < 1e-3),]
+
+which(caqtl_signif$snp_id %in% as.vector(asb_k$snpID))
+which(caqtl_signif$snp_id %in% as.vector(asb_g$snpID))
+```
+ok, so this shows us the following. while the snps which actually impact binding in NFKB1 according to qbic are not tested in the bitbundle analysis, the SNPs that are tested with asb do overlap with several other SNPs, and edges with high differ high differencial scores do have snps in them with significant ASB. So there are probably a lot of stacked motifs, and there is a snp which affects some of them.
+
+looking at caQTLs, we see that those variants whcih are caqtls which overlap with our analysis have high diff scores. This provides a further hypothesis as to how they are disrupting binding
+
+
+
+# Now show that difference scores are predictive of disruption with AUCs
+```{r}
+colnames(validation_table_gm12878) <- c("id","tf","gene","panda","egret_gm12878","chipseq_gm12878","diff_gm12878")
+get_roc_for_top_x <- function(egretNum, x) {
+  
+  top_x_table_gm12878 <- top_n(validation_table_gm12878, x, diff_gm12878)
+  top_x_table_gm12878$disrupt <- 1 - top_x_table_gm12878$chipseq
+  curve <- evalmod(scores = top_x_table_gm12878$diff_gm12878, labels = top_x_table_gm12878$disrupt, posclass = 1)
+  aucs <- precrec::auc(curve)
+  autoplot(curve)
+  auc_gm12878 <- round(aucs$aucs[1], digits=4)
+  prc_gm12878 <- round(aucs$aucs[2], digits=4)
+  nn <- attr(curve$rocs,"data_info")$nn[1]
+  np <- attr(curve$rocs,"data_info")$np[1]
+  
+  result <- c("egret",x, nn, np, auc_gm12878, prc_gm12878)
+  return(result)
+}
+
+egret_priors <- c(1)
+numEdges <- c(10,20,30,40,50,60,70,80,90,100,110,120,130,140,150,160,170,180,190,200)
+
+disrup_auc_topn<- data.frame()
+
+for (p in egret_priors){
+  for (x in numEdges){
+    result <- get_roc_for_top_x(p,x)
+    df <- data.frame(t(result), stringsAsFactors = FALSE)
+    disrup_auc_topn <- rbind(disrup_auc_topn,df)
+  }
+}
+
+colnames(disrup_auc_topn) <- c("egret","topN", "nn", "np", "AU-ROC", "AU-PR")
+disrup_auc_topn
+print(xtable(disrup_auc_topn[,c(2,3,4,5,6)], type = "latex", digits = 5), file = "../tables/disruption_auc_table_allQBiCModels_topn_gm12878.tex",include.rownames=FALSE,)
+```
+
+```{r}
+colnames(validation_table_k562) <- c("id","tf","gene","panda","egret_k562","chipseq_k562","diff_k562")
+
+get_roc_for_top_x <- function(egretNum, x) {
+  
+  top_x_table_k562 <- top_n(validation_table_k562, x, diff_k562)
+  top_x_table_k562$disrupt <- 1 - top_x_table_k562$chipseq
+  curve <- evalmod(scores = top_x_table_k562$diff_k562, labels = top_x_table_k562$disrupt, posclass = 1)
+  aucs <- precrec::auc(curve)
+  autoplot(curve)
+  auc_k562 <- round(aucs$aucs[1], digits=4)
+  prc_k562 <- round(aucs$aucs[2], digits=4)
+  nn <- attr(curve$rocs,"data_info")$nn[1]
+  np <- attr(curve$rocs,"data_info")$np[1]
+  
+  result <- c("egret",x, nn, np, auc_k562, prc_k562)
+  return(result)
+}
+
+egret_priors <- c(1)
+numEdges <- c(10,20,30,40,50,60,70,80,90,100,110,120,130,140,150,160,170,180,190,200)
+
+disrup_auc_topn<- data.frame()
+
+for (p in egret_priors){
+  for (x in numEdges){
+    result <- get_roc_for_top_x(p,x)
+    df <- data.frame(t(result), stringsAsFactors = FALSE)
+    disrup_auc_topn <- rbind(disrup_auc_topn,df)
+  }
+}
+
+colnames(disrup_auc_topn) <- c("egret","topN", "nn", "np", "AU-ROC", "AU-PR")
+disrup_auc_topn
+print(xtable(disrup_auc_topn[,c(2,3,4,5,6)], type = "latex", digits = 5), file = "../tables/disruption_auc_table_allQBiCModels_topn_k562.tex",include.rownames=FALSE,)
+```
+
+
+# Analysis of edited prior edges
+```{r}
+# load gm12878 edited prior edges
+edited_gm12878 <- read.table("../outputs/edge_modifications_EGRET_allQBiCModels_na12878_08172020.txt", header = FALSE)
+dim(edited_gm12878)
+colnames(edited_gm12878) <- c("tf","gene","id","mod")
+
+p1 <- ggplot(edited_gm12878, aes(x=mod)) + geom_density(alpha = 0.1, fill=pallet[3], col = pallet[3]) + theme_bw() + scale_color_manual(values=pallet) + scale_fill_manual(values=pallet) +labs(title="GM12878", x ="Prior modification", y = "Frequency")
+
+
+edited_gm12878_chip <- edited_gm12878[which(edited_gm12878$tf %in% chipseq_regnet_gm12878$tf),]
+edited_gm12878_chip$chipseq <- ifelse(edited_gm12878_chip$id %in% chipseq_regnet_gm12878$id, 1, 0)
+
+# count number of 1's
+dim(edited_gm12878_chip[edited_gm12878_chip$chipseq == 1,])
+dim(edited_gm12878_chip[edited_gm12878_chip$chipseq == 0,])
+```
+
+
+```{r}
+# load k562 edited prior edges
+edited_k562 <- read.table("../outputs/edge_modifications_EGRET_allQBiCModels_k562_08172020.txt", header = FALSE)
+dim(edited_k562)
+colnames(edited_k562) <- c("tf","gene","id","mod")
+
+p2 <- ggplot(edited_k562, aes(x=mod)) + geom_density(alpha = 0.1, fill=pallet[2], col = pallet[2]) + theme_bw() + scale_color_manual(values=pallet) + scale_fill_manual(values=pallet) +labs(title="K562", x ="Prior modification", y = "Frequency")
+p2
+p3 <- grid.arrange(p1 + theme(legend.position="none"), p2 + theme(legend.position="none"), nrow=1, widths = c(4,4))
+#p3
+
+p4 <- annotate_figure(p3,top = text_grob("Prior modification distributions (all QBiC models)", color = "black", face = "bold", size = 14))
+pdf("../figures/modification_distribution_allQBiCModels.pdf",width = 6, height = 4)
+plot(p4)
+dev.off()
+
+edited_k562_chip <- edited_k562[which(edited_k562$tf %in% chipseq_regnet_k562$tf),]
+edited_k562_chip$chipseq <- ifelse(edited_k562_chip$id %in% chipseq_regnet_k562$id, 1, 0)
+
+# count number of 1's
+dim(edited_k562_chip[edited_k562_chip$chipseq == 1,])
+dim(edited_k562_chip[edited_k562_chip$chipseq == 0,])
+```
+
+```{r}
+topn_gm12878 <- top_n(validation_table_gm12878, 48, diff_gm12878)
+test <- t.test(topn_gm12878[which(topn_gm12878$chipseq_gm12878 == 0),]$egret_gm12878,topn_gm12878[which(topn_gm12878$chipseq_gm12878 == 1),]$egret_gm12878  , alternative="greater")
+
+
+p1 <- ggplot(topn_gm12878, aes(x = as.factor(chipseq_gm12878), y = egret_gm12878, color = as.factor(chipseq_gm12878), group = as.factor(chipseq_gm12878)))+ geom_boxplot() + geom_jitter(position=position_jitter(0.1))+  stat_summary(fun.y=mean, geom="point", shape=18,size=5, color="#E41A1C") + theme_bw() + scale_color_manual(values=pallet)  + theme(legend.position="right") + labs(title="GM12878", x ="ChIP-seq binding", y = "Edge disruption score", color  = "ChIP-seq binding") + annotate("text", x = 1.6, y = 7.5, label = paste0("t-test p= ",signif(test$p.value,4)))
+
+topn_k562 <- top_n(validation_table_k562, 48, diff_k562)
+
+test <- t.test(topn_k562[which(topn_k562$chipseq_k562 == 0),]$egret_k562,topn_k562[which(topn_k562$chipseq_k562 == 1),]$egret_k562, alternative="greater")
+
+
+p2 <- ggplot(topn_k562, aes(x = as.factor(chipseq_k562), y = egret_k562, color = as.factor(chipseq_k562), group = as.factor(chipseq_k562)))+ geom_boxplot() + geom_jitter(position=position_jitter(0.1))+  stat_summary(fun.y=mean, geom="point", shape=18,size=5, color="#E41A1C") + theme_bw() + scale_color_manual(values=pallet)  + theme(legend.position="right") + labs(title="K562", x ="ChIP-seq binding", y = "Edge disruption score", color  = "ChIP-seq binding") + annotate("text", x = 1.7, y = 10, label = paste0("t-test p= ",signif(test$p.value,4)))
+
+p3 <- grid.arrange(p1 + theme(legend.position="none"), p2 + theme(legend.position="right"), nrow=1, widths = c(3.5,5.9))
+p4 <- annotate_figure(p3,top = text_grob("Top 35 edge disruption scores", color = "black", face = "bold", size = 14))
+
+#pdf("../figures/top35_diffvalues_boxplots_k562_gm12878.pdf",width = 6, height = 3.5)
+plot(p4)
+#dev.off()
+#plot(p4)
+```
+
+
+
+```
+data <- combined_table_bbseq_tested
+#curve_data <- evalmod(scores = data$diff_diff_egret_k_g, labels = data$bbseq_gene)
+#autoplot(curve_data)
+#curve_data
+
+mylist <- as.vector(data[order(-as.numeric(as.vector(data$diff_diff_egret_k_g))),1])
+subset <- data[which(data$bbseq_gene == 1),1]
+test <- TestNodeRank(mylist, subset)
+test
+
+t.test(data[which(data$bbseq_gene == 1),]$diff_diff_egret_k_g,data[which(data$bbseq_gene == 0),]$diff_diff_egret_k_g, alternative="greater")
+
+#mean(data[which(data$bbseq_gene == 1),]$diff_diff_egret_k_g)
+#mean(data[which(data$bbseq_gene == 0),]$diff_diff_egret_k_g)
+```
+
+```
+data <- combined_table
+curve_data <- evalmod(scores = data$diff_egret_egret_k_g, labels = data$diff_chip_k_g)
+autoplot(curve_data)
+curve_data
+
+
+mylist <- as.vector(data[order(-as.numeric(as.vector(data$diff_diff_egret_k_g))),1])
+subset <- data[which(data$diff_chip_k_g == 1),1]
+test <- TestNodeRank(mylist, subset)
+test
+
+t.test(data[which(data$diff_chip_k_g == 1),]$diff_egret_egret_k_g,data[which(data$diff_chip_k_g == 0),]$diff_egret_egret_k_g, alternative="greater")
+
+mean(data[which(data$diff_chip_k_g == 1),]$diff_egret_egret_k_g)
+mean(data[which(data$diff_chip_k_g == 0),]$diff_egret_egret_k_g)
+
+
+```
+
+```
+data <- combined_table
+curve_data <- evalmod(scores = data$diff_diff_egret_k_g, labels = data$diff_chip_k_g)
+autoplot(curve_data)
+curve_data
+
+
+mylist <- as.vector(data[order(-as.numeric(as.vector(data$diff_diff_egret_k_g))),1])
+subset <- data[which(data$diff_chip_k_g == 1),1]
+test <- TestNodeRank(mylist, subset)
+test
+```
+
+
+
+
+```
+data <- combined_modified3
+mylist <- as.vector(data[order(-as.numeric(as.vector(data$diff_egret_k_g))),1])
+subset <- data[which(data$diff_chip_k_g == 1),1]
+test <- TestNodeRank(mylist, subset)
+test
+```
+
+```
+data <- combined_modified3
+curve_data <- evalmod(scores = data$diff_egret_k_g, labels = data$diff_chip_k_g)
+autoplot(curve_data)
+curve_data
+
+curve_data <- evalmod(scores = data$egret_k562, labels = data$chipseq_k562)
+autoplot(curve_data)
+curve_data
+```

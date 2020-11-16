@@ -1,7 +1,7 @@
 ---
-title: "Run final Egret v1 - K562"
+title: "Run finalEgret v1 - GM12878"
 author: "Deborah Weighill"
-date: "August 17, 2020"
+date: "July 1, 2020"
 output:
   html_notebook:
     toc: true
@@ -12,7 +12,7 @@ ___
 # Description
 ___
 
-Running EGRET on K562, all QBiC models.
+Running finalEgret v1 on GM12878 with no caQTLs.
 
 # Libraries and tags
 ```{r libraries_and_tags}
@@ -27,10 +27,7 @@ library(dplyr)
 library(pandaR)
 
 # this tag should indicate the genotype and the date
-tag <- "EGRET_allQBiCModels_k562_10142020b"
-
-# make a name for log file
-logfile <- paste0("../outputs/log_",tag,".txt")
+tag <- "finalEgret_v1_na12878_allModels_smart7_07012020"
 ```
 
 # Inputs
@@ -38,10 +35,12 @@ logfile <- paste0("../outputs/log_",tag,".txt")
 Individual inputs:
 ```{r individual_inputs}
 
-qbic <- read.table(file = "../inputs/qbic_eQTLS_GM12878_K562_finalEGRET_v1_06302020_allModels_smart1.txt", header = FALSE)
+#individual qbic results for caQTL and eQTL - these are qbic results of qtls which are (1) in motifs within the promotor region of genes (2) for eQTLs, the eGene is the adjacent gene, for caQTLs, the accessibility region overlaps the motif, (3) the vcf file of the individual(s) in question contains the QTL as an alternate allele and (4) the qbic effect is negative, is predicted from human pbms and predicts a change in binding.
+qbic <- read.table(file = "../inputs/qbic_eQTLS_GM12878_K562_finalEGRET_v1_06302020_allModels_smart7.txt", header = FALSE)
+
   
 # individual genotype
-vcf <- read.table("../genotype_data/K562_formatted.vcf", header = FALSE, sep = "\t")
+vcf <- read.table("../genotype_data/NA12878.vcf", header = FALSE, sep = "\t")
 ```
 
 General inputs:
@@ -105,16 +104,18 @@ qbic_ag$absQbicEffectSize <- abs(qbic_ag$qbicEffectSize)
 ## Calculating alt allele count for each qbic SNP.
 Label each eqtl snp with the alternate allele count for the genotype in question (here NA12878)
 ```{r parse_genotype}
-colnames(vcf) <- c("CHROM",  "POS"  ,   "ID"  ,    "REF"  ,   "ALT"   ,  "QUAL"   , "FILTER" , "INFO"   , "FORMAT", "GENOTYPE","alt_allele_count")
+colnames(vcf) <- c("CHROM",  "POS"  ,   "ID"  ,    "REF"  ,   "ALT"   ,  "QUAL"   , "FILTER" , "INFO"   , "FORMAT", "NA12878")
 snp_ids <- paste0(vcf$CHROM,"_",vcf$POS)
 rownames(vcf) <- snp_ids
+vcf <- separate(vcf, NA12878, c("allele1", "allele2"), "\\|", remove = TRUE)
+vcf$alt_allele_count <- as.numeric(vcf$allele1) + as.numeric(vcf$allele2)
 vcf$snp_id <- snp_ids
 
 #assign alt allele count of the individual to the qbic table
-qbic_ag$alt_allele_count <- as.numeric(as.vector(vcf$alt_allele_count))[match(qbic_ag$snpID, vcf$snp_id)]
+qbic_ag$alt_allele_count <- vcf$alt_allele_count[match(qbic_ag$snpID, vcf$snp_id)]
 
 #assign alt allele count of the individual to the QTL table
-qtl$alt_allele_count <- as.numeric(as.vector(vcf$alt_allele_count))[match(qtl$snpID, vcf$snp_id)]
+qtl$alt_allele_count <- vcf$alt_allele_count[match(qtl$snpID, vcf$snp_id)]
 QTL_tf_gene_pairs <- distinct(qtl[,c(1:7)])
 QTL_tf_gene_pairs$edgeE <- rep(1,nrow(QTL_tf_gene_pairs))
 QTL_tf_gene_pairs$alt_allele_count[is.na(QTL_tf_gene_pairs$alt_allele_count)] <- 0
@@ -140,10 +141,6 @@ QTL_tf_gene_pairs[is.na(QTL_tf_gene_pairs)] <- 0
 # now we make our "per SNP" combinations (i.e. products of eQTL and qbic variables)
 QTL_tf_gene_pairs$absQtlQffect_altAlleleCount_qbicEffect <- abs(QTL_tf_gene_pairs$effect) * QTL_tf_gene_pairs$alt_allele_count * QTL_tf_gene_pairs$qbicEffect
 
-# write contributing SNPs to file
-snp_edges_file <- paste0("../outputs/edge_modifications_SNPs",tag,".txt")
-write.table(QTL_tf_gene_pairs[which(QTL_tf_gene_pairs$absQtlQffect_altAlleleCount_qbicEffect != 0),], file = snp_edges_file, sep = "\t", quote=FALSE, row.names = FALSE, col.names = FALSE)
-
 ```
 
 Now we have a matrix of QTLs (and their associated TF-gene edge) as well as their qbic effect (which can be zero if the qbic effect of the SNP was not significant for that TF) and the combinations of QTL and qbic data.
@@ -164,15 +161,6 @@ absQtlQffect_altAlleleCount_qbicEffect <- aggregate(absQtlQffect_altAlleleCount_
 
 # put into mods matrix
 mods$absQtlQffect_altAlleleCount_qbicEffect <- absQtlQffect_altAlleleCount_qbicEffect$absQtlQffect_altAlleleCount_qbicEffect[match(mods$edgeID, absQtlQffect_altAlleleCount_qbicEffect$edgeID)]
-
-# number of edited edges
-edits <- dim(mods[which(mods$absQtlQffect_altAlleleCount_qbicEffect != 0),])[1]
-message <- paste0("Number of edited edges: ",edits)
-write(c(message), file = logfile, append = TRUE)
-
-# write edited prior edges to file
-mod_edges_file <- paste0("../outputs/edge_modifications_",tag,".txt")
-write.table(mods[which(mods$absQtlQffect_altAlleleCount_qbicEffect != 0),], file = mod_edges_file, sep = "\t", quote=FALSE, row.names = FALSE, col.names = FALSE)
 ```
 
 
@@ -207,7 +195,7 @@ write.table(combined, file = priorfile, col.names = TRUE, row.names = FALSE, sep
 
 ```{r run_message_passing}
 processes <- c(1)
-prior_list <- list(egretPrior)
+prior_list <- list( egretPrior)
 prior_names <- c("egret")
 
 mclapply(processes, function(p) {

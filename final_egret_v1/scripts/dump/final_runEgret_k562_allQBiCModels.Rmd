@@ -27,7 +27,7 @@ library(dplyr)
 library(pandaR)
 
 # this tag should indicate the genotype and the date
-tag <- "EGRET_allQBiCModels_k562_10142020b"
+tag <- "EGRET_allQBiCModels_k562_08172020"
 
 # make a name for log file
 logfile <- paste0("../outputs/log_",tag,".txt")
@@ -140,7 +140,7 @@ QTL_tf_gene_pairs[is.na(QTL_tf_gene_pairs)] <- 0
 # now we make our "per SNP" combinations (i.e. products of eQTL and qbic variables)
 QTL_tf_gene_pairs$absQtlQffect_altAlleleCount_qbicEffect <- abs(QTL_tf_gene_pairs$effect) * QTL_tf_gene_pairs$alt_allele_count * QTL_tf_gene_pairs$qbicEffect
 
-# write contributing SNPs to file
+# writecontributing SNPs to file
 snp_edges_file <- paste0("../outputs/edge_modifications_SNPs",tag,".txt")
 write.table(QTL_tf_gene_pairs[which(QTL_tf_gene_pairs$absQtlQffect_altAlleleCount_qbicEffect != 0),], file = snp_edges_file, sep = "\t", quote=FALSE, row.names = FALSE, col.names = FALSE)
 

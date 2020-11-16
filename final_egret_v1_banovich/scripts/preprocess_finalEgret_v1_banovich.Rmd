@@ -1,7 +1,6 @@
 ---
-title: "Final EGRET v1 Banovich - Application to Banovich data"
+title: "Preprocessing data for EGRET on Banovich et al data"
 author: "Deborah Weighill"
-date: "June 17, 2020"
 output:
   html_notebook:
     toc: true
@@ -37,7 +36,7 @@ gr_genes_promotor <- GRanges(seqnames = genes$chrom, ranges = IRanges(start = ge
 
 # Motif data
 
-We use motif data from ~/EGRET/final_egret_v1/
+We use the sane motif data as processed in ~/EGRET/final_egret_v1/scripts/preprocess_finalEGRET_v1.Rmd
 
 
 # Map eQTLs to motifs within promotors
@@ -241,8 +240,8 @@ write.table(unique(genotype_eqtls_noIndels), file =eqtl_vcf, col.names = FALSE, 
 # Make expression matrix
 
 ## LCL
-These are WASP + qqnorm proccessed, as shown on the website we got the data 
-http://eqtl.uchicago.edu/jointLCL/
+These are WASP + qqnorm proccessed, as shown on the source website (http://eqtl.uchicago.edu/jointLCL/)
+
 ```{r}
 expr <- fread("../data/LCL/fastqtl_qqnorm_RNAseqGeuvadis_phase2.txt", header = TRUE, skip = 0, drop = c(1,2,3), data.table = FALSE)
 expr$ID<-sub("\\.[0-9]","", expr$ID)
@@ -260,7 +259,7 @@ save(expr_df, file = "../inputs/iPSC_expr_data_finalEgret_v1_banovich_06172020.R
 ```
 
 ## iPSC-CM
-Note - These are also WASP processed, but they are raw counts sas detailed in the series matrix file from GEO https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE107654. We need to standardize the rows (genes) and qqnorm the columns (individuals).
+Note - These are also WASP processed, but they are raw counts as detailed in the series matrix file from GEO https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE107654. We need to standardize the rows (genes) and qqnorm the columns (individuals).
 ```{r}
 expr <- fread("../data/iPSC-CM/GSE107654_iPSC-CM_counts.txt", header = TRUE, skip = 0, data.table = FALSE)
 expr_df <- data.frame(expr, row.names = 1)

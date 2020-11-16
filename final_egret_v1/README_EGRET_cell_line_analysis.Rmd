@@ -1,0 +1,74 @@
+---
+title: "EGRET on cell lines:"
+subtitle: "Outline of process for running EGRET on two cell lines and subsequent analysis"
+author: "Deborah Weighill"
+date: "June 17, 2020"
+output:
+  html_notebook:
+    toc: true
+    theme: cosmo
+    df_print: paged
+---
+
+# Data
+Collect the data required.
+
+- Transcription start sites from UCSC Table Browser, Ensembl genes table for hg19 (https://genome.ucsc.edu/cgi-bin/hgTables)
+- Gene annotation (ftp://ftp.ensembl.org/pub/grch37/current/gtf/homo_sapiens/Homo_sapiens.GRCh37.87.chr.gtf.gz)
+- Gene expression and eQTLs for LCLs (https://gtexportal.org/home/datasets)
+- motif scans, run using FIMO (http://meme-suite.org/doc/fimo.html)
+- GM12878 genome (https://www.illumina.com/platinumgenomes.html)
+- K562 genome (https://www.encodeproject.org/files/ENCFF538YDL/)
+- ChIP-seq for GM12878 and K562 (http://pedagogix-tagc.univ-mrs.fr/remap/index.php?page=download)
+- caQTLs in LCLs (http://eqtl.uchicago.edu/yri_ipsc/cht_results_full_LCL.txt)
+- Allele-specific expression using BiT-STARR-seq method in LCLs (https://genome.cshlp.org/content/suppl/2018/10/17/gr.237354.118.DC1/Supplemental_Table_S1_.txt)
+- Genotypes for 119 Yoruba individuals (http://eqtl.uchicago.edu/)
+- GWAS catalog (https://www.ebi.ac.uk/gwas/api/search/downloads/full)
+- PPI network (https://sites.google.com/a/channing.harvard.edu/kimberlyglass/tools/gtex-networks)
+
+# Software need
+- R/Rstudio
+- FIMO (http://meme-suite.org/doc/fimo.html)
+- QBiC offline version (https://github.com/vincentiusmartin/QBiC-Pred/tree/master/qbic-offline)
+- ALPACA (https://github.com/meghapadi/ALPACA)
+- PANDA (https://www.bioconductor.org/packages/release/bioc/html/pandaR.html)
+
+
+# Preprocess the data
+Data was preprocessed for input into EGRET and further analyses using the notebook "/scripts/preprocess_finalEGRET_v1.Rmd". 
+
+The K562 genotype was also preprocessed using the "/scripts/parse_k562_genotype.pl" script because this cell line has ploidy issues, which is reflected in the format of the vcf information column. We thus preprocess this to add an extra "clean" column with the alternate allele counts.
+
+# Run QBiC - GM12878 and K562, and process the results
+QBiC was run using the follwing command:
+
+python3 ~/QBiC-Pred-master/qbic-offline/qbic.py -i /home/ubuntu/egretFinal_v1/qbic_qtls_gm12878_k562/unique_eQTLs_moti
+f_promotor_finalEGRET_v1_06172020_GM12878_K562.vcf   -g /home/ubuntu/egretFinal_v1/qbic_qtls_gm12878_k562/all_tfs.txt 
+-c hg19 -o QTLs_GM12878_K562_QbicPred_finalEGRET_v1_06172020.txt
+
+Parse the QBiC results to apply a more stringent threshold to non-human PBM-derived models and to include disruptions only. QBiC results were aprsed using the following commandline with the "/scripts/parse_qbic_smart1.pl" script:
+```{r}
+system("perl /home/ubuntu/EGRET/final_egret_v1/scripts/parse_qbic_smart1.pl /home/ubuntu/EGRET/final_egret_v1/genotype_data/unique_eQTLs_motif_promotor_finalEGRET_v1_06172020_GM12878_K562.vcf /home/ubuntu/EGRET/final_egret_v1/genotype_data/QTLs_GM12878_K562_QbicPred_finalEGRET_v1_06172020.txt /home/ubuntu/EGRET/final_egret_v1/inputs/qbic_eQTLS_GM12878_K562_finalEGRET_v1_06302020_allModels_smart1.txt")
+
+system("perl /home/ubuntu/EGRET/final_egret_v1/scripts/parse_qbic_smart1_separate_chroms.pl")
+
+```
+
+
+
+# Run EGRET GM12878 and K562 
+We then ran EGRET using the following R notebooks on the commandline as follows:
+
+Rscript -e "rmarkdown::render('final_runEgret_na12878_allQBiCModels.Rmd')"
+Rscript -e "rmarkdown::render('final_runEgret_k562_allQBiCModels.Rmd')"
+
+Rscript -e "rmarkdown::render('runEgret_noQbic_gm12878.Rmd')"
+Rscript -e "rmarkdown::render('runEgret_onlyQbic_gm12878.Rmd')"
+Rscript -e "rmarkdown::render('runEgret_onlyQTLs_gm12878.Rmd')"
+Rscript -e "rmarkdown::render('runEgret_noExpr_noPPI_gm12878.Rmd')"
+
+
+# Validation, analysis and visualization  
+Comparison and validation of the EGRET networks for these two cell line genotypes was performed using the "cell_line_genotype_validation_09162020.Rmd" R notebook. This also produces the figures from the paper. The make_beds.pl script makes bed files for the eQTLs and locations for visualization in IGV.
+
+

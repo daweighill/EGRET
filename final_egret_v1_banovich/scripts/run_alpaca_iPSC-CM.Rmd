@@ -1,17 +1,12 @@
 ---
-title: "Final EGRET v1: testing alpaca on a banovich network"
+title: "Run ALPACA on CMs EGRET networks (Banovich data set)"
 author: "Deborah Weighill"
-date: "July 29, 2020"
 output:
   html_notebook:
     toc: true
     theme: cosmo
     df_print: paged
 ---
-
-
-# Overview
-This script validates the PANDA and EGRET networks against ChIP-seq data.
 
 
 # Libraries, tags and inputs
@@ -37,14 +32,11 @@ library(ALPACA)
 ```
 `
 ```{r}
-
 load("../outputs/iPSC-CM_table_banovich_finalEgret_v1_allModels_smart1_07042020.RData")
 ```
 
 ```{r}
-
-#individuals <- c(1:119)
-individuals <- c(101,105,109,111,115,119,39,49,59,69,79,89,99,91,81,71)
+individuals <- c(1:119)
 mclapply(individuals, function(i) {
   egret_col <- 4 + i
   panda_col <- 4

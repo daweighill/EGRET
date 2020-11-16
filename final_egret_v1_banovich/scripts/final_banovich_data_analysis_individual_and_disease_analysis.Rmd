@@ -1,16 +1,13 @@
 ---
-title: "Final EGRET v1 Banovich application - Data Analysis"
+title: "Analysis of EGRET networks"
+subtitle: "Analysis of EGRET networks derived from 119 individuals and 3 cell types (Banovich et al dataset)"
 author: "Deborah Weighill"
-date: "August 6, 2020"
 output:
   html_notebook:
     toc: true
     theme: cosmo
     df_print: paged
 ---
-
-# Overview
-Here we do some analysis on the banovich results for the "application". 
 
 # Load libraries
 ```{r}
@@ -26,10 +23,14 @@ library(ALPACA)
 library(gridExtra)
 library(grid)
 library(gridExtra)
-pallet <- c("#FFBF00",  "#870E75"  ,  "#0BB19F" )
-#amber, magenta, teal
-```
+library(ggthemes)
+library(forcats)
 
+# This is our color pallet
+#amber, magenta, teal
+pallet <- c("#FFBF00",  "#870E75"  ,  "#0BB19F" )
+
+```
 
 # Data loading and parsing: Make Panda/EGRET edge table
 
@@ -61,9 +62,8 @@ for (g in c(1:119)) {
     colnames(regnet_edge_table_LCL)[colnames(regnet_edge_table_LCL) == "tempID"] <- paste0("LCL_indiv_",g)
   }
 }
-save(regnet_edge_table_LCL, file = "../outputs/LCL_table_banovich_finalEgret_v1_allModels_smart1_07042020.RData")
+save(regnet_edge_table_LCL, file = "../outputs/LCL_table_EGRET_banovich_allModels.RData")
 ```
-
 
 ## Load the iPSC results
 ```{r echo=FALSE,results='hide'}
@@ -89,7 +89,7 @@ for (g in c(1:119)) {
     colnames(regnet_edge_table_iPSC)[colnames(regnet_edge_table_iPSC) == "tempID"] <- paste0("iPSC_indiv_",g)
   }
 }
-save(regnet_edge_table_iPSC, file = "../outputs/iPSC_table_banovich_finalEgret_v1_allModels_smart1_07042020.RData")
+save(regnet_edge_table_iPSC, file = "../outputs/iPSC_table_EGRET_banovich_allModels.RData")
 ```
 
 ## Load the iPSC-CM results
@@ -116,24 +116,19 @@ for (g in c(1:119)) {
     colnames(regnet_edge_table_iPSC_CM)[colnames(regnet_edge_table_iPSC_CM) == "tempID"] <- paste0("iPSC-CM_indiv_",g)
   }
 }
-save(regnet_edge_table_iPSC_CM, file = "../outputs/iPSC-CM_table_banovich_finalEgret_v1_allModels_smart1_07042020.RData")
+save(regnet_edge_table_iPSC_CM, file = "../outputs/CM_table_EGRET_banovich_allModels.RData")
 ```
-
 
 ## Merge into a single table with an inner join
 This ensures that we are considering the same set of edges for the two tissues (LCL and iPSC).
 
 ```{r}
-#load("../outputs/LCL_table_banovich_finalEgret_v1_06292020.RData")
-#load("../outputs/iPSC_table_banovich_finalEgret_v1_allModels_smart1_07042020.RData")
-#load("../outputs/iPSC-CM_table_banovich_finalEgret_v1_allModels_smart1_07042020.RData")
 pre_merged_regnet_table <- merge(regnet_edge_table_LCL,regnet_edge_table_iPSC, by.x = c(1,2,3), by.y = c(1,2,3), all = FALSE)
 merged_regnet_table <- merge(pre_merged_regnet_table,regnet_edge_table_iPSC_CM,by.x = c(1,2,3), by.y = c(1,2,3), all = FALSE)
 colnames(merged_regnet_table)[4] <- "LCL_panda"
 colnames(merged_regnet_table)[124] <- "iPSC_panda"
 colnames(merged_regnet_table)[244] <- "iPSC-CM_panda"
-save(merged_regnet_table, file = "../outputs/merged_regnet_table_banovich_allModels_smart1_07032020.RData")
-load("../outputs/merged_regnet_table_banovich_allModels_smart1_07032020.RData")
+save(merged_regnet_table, file = "../outputs/merged_regnet_table_EGRET_banovich.RData")
 ```
 
 ## Construct edge differences from PANDA
@@ -146,7 +141,7 @@ for (i in c(1:119)){
   diff_table[,124+i] <- abs(merged_regnet_table[,124+i]-merged_regnet_table[,124])
   diff_table[,244+i] <- abs(merged_regnet_table[,244+i]-merged_regnet_table[,244])
 }
-save(diff_table, file = "../outputs/diffTable_merged_LCL_iPSC_iPSC-CM_banovich_edge_table_allModels_smart1_07032020.RData")
+save(diff_table, file = "../outputs/diffTable_merged_banovich_edge_table.RData")
 ```
 
 ## Parse and load the GWAS results
@@ -169,7 +164,7 @@ command <- paste0("perl /home/ubuntu/EGRET/final_egret_v1_banovich/scripts/parse
 system(command)
 ```
 
-Now load the gwas results each into a data frame
+Now load the gwas results into a data frame
 
 ```{r}
 # load gene annotation to assign gene id to gene name
@@ -185,28 +180,26 @@ CAD$gene <- nameGeneMap$gene[match(CAD$name, nameGeneMap$name)]
 
 ```
 
-Now load the difference table we made before, and merge in the GWAS traits
+Mark genes/tfs in our EGRET networks which are GWAS hits
 ```{r}
 diff_table$GWAS_CD_tf <- ifelse(diff_table$tf %in% CD$name, 1, 0)
 diff_table$GWAS_CD_gene <- ifelse(diff_table$gene %in% CD$gene, 1, 0)
 diff_table$GWAS_CAD_tf <- ifelse(diff_table$tf %in% CAD$name, 1, 0)
 diff_table$GWAS_CAD_gene <- ifelse(diff_table$gene %in% CAD$gene, 1, 0)
-save(diff_table, file = "../outputs/diff_table_with_gwas_banovich_allModels_smart1_07042020.RData")
+save(diff_table, file = "../outputs/diffTable_withGWAS_merged_banovich_edge_table.RData")
 ```
 
 # Investigation of TF disruption Scores
 Load the differences table
 ```{r}
-load("../outputs/diff_table_with_gwas_banovich_allModels_smart1_07042020.RData")
+load("../outputs/diffTable_withGWAS_merged_banovich_edge_table.RData")
 ```
 
 ## Load gwas
 ```{r}
-
 # load gene annotation to assign gene id to gene name
 nameGeneMap <- read.table("../../final_egret_v1/annotation/geneID_name_map.txt", header = FALSE)
 colnames(nameGeneMap) <- c("gene","name")
-
 
 CD <- read.table("../gwas/CD_gwas_parsed.txt", header = FALSE,  sep = "\t")
 colnames(CD) <- c("CDtrait","name")
@@ -215,7 +208,6 @@ CD$gene <- nameGeneMap$gene[match(CD$name, nameGeneMap$name)]
 CAD <- read.table("../gwas/CAD_gwas_parsed.txt", header = FALSE,  sep = "\t")
 colnames(CAD) <- c("CADtrait","name")
 CAD$gene <- nameGeneMap$gene[match(CAD$name, nameGeneMap$name)]
-
 ```
 
 ## Hard threshold edge differences, aggregate by tf and gene
@@ -233,18 +225,8 @@ tf_degrees_hard_thresh$GWAS_CD_tf <- ifelse(tf_degrees_hard_thresh$tf %in% CD$na
 gene_degrees_hard_thresh$GWAS_CD_gene <- ifelse(gene_degrees_hard_thresh$gene %in% CD$gene, 1, 0)
 tf_degrees_hard_thresh$GWAS_CAD_tf <- ifelse(tf_degrees_hard_thresh$tf %in% CAD$name, 1, 0)
 gene_degrees_hard_thresh$GWAS_CAD_gene <- ifelse(gene_degrees_hard_thresh$gene %in% CAD$gene, 1, 0)
-tf_degrees_hard_thresh$GWAS_MI_tf <- ifelse(tf_degrees_hard_thresh$tf %in% MI$name, 1, 0)
-gene_degrees_hard_thresh$GWAS_MI_gene <- ifelse(gene_degrees_hard_thresh$gene %in% MI$gene, 1, 0)
-tf_degrees_hard_thresh$GWAS_MS_tf <- ifelse(tf_degrees_hard_thresh$tf %in% MS$name, 1, 0)
-gene_degrees_hard_thresh$GWAS_MS_gene <- ifelse(gene_degrees_hard_thresh$gene %in% MS$gene, 1, 0)
-tf_degrees_hard_thresh$GWAS_RA_tf <- ifelse(tf_degrees_hard_thresh$tf %in% RA$name, 1, 0)
-gene_degrees_hard_thresh$GWAS_RA_gene <- ifelse(gene_degrees_hard_thresh$gene %in% RA$gene, 1, 0)
-tf_degrees_hard_thresh$GWAS_BMI_tf <- ifelse(tf_degrees_hard_thresh$tf %in% BMI$name, 1, 0)
-gene_degrees_hard_thresh$GWAS_BMI_gene <- ifelse(gene_degrees_hard_thresh$gene %in% BMI$gene, 1, 0)
-save(tf_degrees_hard_thresh,file = "tf_degrees_hard_thresh_035.RData")
-save(gene_degrees_hard_thresh,file = "gene_degrees_hard_thresh_035.RData")
-load("tf_degrees_hard_thresh_035.RData")
-load("gene_degrees_hard_thresh_035.RData")
+save(tf_degrees_hard_thresh,file = "../outputs/tf_degrees_hard_thresh_035.RData")
+save(gene_degrees_hard_thresh,file = "../outputs/gene_degrees_hard_thresh_035.RData")
 ```
 
 
@@ -252,7 +234,7 @@ load("gene_degrees_hard_thresh_035.RData")
 
 ```{r}
 tf_degrees_hard_thresh_scaled <- scale(tf_degrees_hard_thresh[,c(2:358)], center = TRUE, scale = TRUE)
-tf_degrees_hard_thresh_scaled <- cbind(tf_degrees_hard_thresh[,c(1)], tf_degrees_hard_thresh_scaled, tf_degrees_hard_thresh[,c(359:364)])
+tf_degrees_hard_thresh_scaled <- cbind(tf_degrees_hard_thresh[,c(1)], tf_degrees_hard_thresh_scaled, tf_degrees_hard_thresh[,c(359:360)])
 colnames(tf_degrees_hard_thresh_scaled)[1] <-"tf"
 
 tf_degrees <- tf_degrees_hard_thresh
@@ -267,10 +249,6 @@ colnames(tf_degrees_melted) <- c("tf","individual","diff_out_degree","Tissue")
 
 ggplot(tf_degrees_melted, aes(x=Tissue, y=diff_out_degree, fill=Tissue, col = Tissue)) + geom_violin() + theme_bw() + scale_fill_manual(values=pallet) + scale_color_manual(values=pallet) + labs(title="Distribution of TF Disruption Scores", x ="Cell type", y = "TF Disruption Score") + theme(legend.position="none")
 
-ggplot(tf_degrees_melted, aes(x=diff_out_degree,  color=Tissue)) + geom_density() + theme_bw() + scale_color_manual(values=pallet) +labs(title=NULL, x ="Scaled TF disruption score", y = "Frequency") +  xlim(-1, 1)
-
-ggplot(tf_degrees_melted, aes(x=diff_out_degree,  color=Tissue, fill = Tissue)) + geom_density(alpha = 0.1) + theme_bw() + scale_color_manual(values=pallet) + scale_fill_manual(values=pallet) +labs(title=NULL, x ="Scaled TF disruption score", y = "Frequency") +  xlim(0.1, 10)
-
 tf_degrees <- tf_degrees_hard_thresh_scaled
 tf_degree_lcl <- melt(tf_degrees[,c(1,c(2:120))], id.vars = c("tf"))
 tf_degree_lcl$tissue <- "LCL"
@@ -282,10 +260,6 @@ tf_degrees_melted <- rbind(tf_degree_lcl,tf_degree_iPSC,tf_degree_iPSC_CM)
 colnames(tf_degrees_melted) <- c("tf","individual","diff_out_degree","Tissue")
 
 ggplot(tf_degrees_melted, aes(x=Tissue, y=diff_out_degree, fill=Tissue, col = Tissue)) + geom_violin() + theme_bw() + scale_fill_manual(values=pallet) + scale_color_manual(values=pallet) + labs(title="Distribution of TF Disruption Scores", x ="Cell type", y = "TF Disruption Score") + theme(legend.position="none")
-
-ggplot(tf_degrees_melted, aes(x=diff_out_degree,  color=Tissue)) + geom_density() + theme_bw() + scale_color_manual(values=pallet) +labs(title=NULL, x ="Scaled TF disruption score", y = "Frequency") 
-
-ggplot(tf_degrees_melted, aes(x=diff_out_degree,  color=Tissue, fill = Tissue)) + geom_density(alpha = 0.1) + theme_bw() + scale_color_manual(values=pallet) + scale_fill_manual(values=pallet) +labs(title=NULL, x ="Scaled TF disruption score", y = "Frequency") +  xlim(0.001, 10)
 
 ```
 
@@ -321,7 +295,7 @@ ttest_df <- NULL
 ttest_df$Disease <- c("CAD","CAD","CD","CD")
 ttest_df$CellType <- c("LCL","CM","LCL","CM")
 ttest_df$pval <- as.character(signif(c(test_cad_in_lcl$p.value,test_cad_in_cm$p.value,test_cd_in_lcl$p.value,test_cd_in_cm$p.value),5))
-print(xtable(as.data.frame(ttest_df), type = "latex"), file = "../tables/ttext_diseases_tissues.tex", include.rownames=FALSE)
+print(xtable(as.data.frame(ttest_df), type = "latex"), file = "../tables/ttest_diseases_tissues.tex", include.rownames=FALSE)
 ```
 
 ## Individual-level TF disruption scores for CAD and CD genes
@@ -334,36 +308,28 @@ cad_tfs_degree_hard_thresh_melted <- melt(cad_tfs_degree_hard_thresh)
 colnames(cad_tfs_degree_hard_thresh_melted) <- c("tf","sample","tf_diff_degree")
 cad_tfs_degree_hard_thresh_melted <- separate(cad_tfs_degree_hard_thresh_melted, sample, c("cellType","tag", "indiv"), "_", remove = TRUE)
 
-p1 <- ggplot(cad_tfs_degree_hard_thresh_melted) + geom_point(shape = 19, aes(x = reorder(indiv, -tf_diff_degree), y = tf_diff_degree, col = cellType),) + theme_classic()+ scale_color_manual(values=pallet)+ xlab("Individual") + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())  + labs(y = "Scaled TF disruption score", title = "CAD genes",col = "Cell type",shape = "TF") 
+cad_plot <- ggplot(cad_tfs_degree_hard_thresh_melted) + geom_point(shape = 19, aes(x = reorder(indiv, -tf_diff_degree), y = tf_diff_degree, col = cellType),) + theme_classic()+ scale_color_manual(values=pallet)+ xlab("Individual") + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())  + labs(title = "CAD TFs",col = "Cell type",shape = "TF")  + facet_grid(. ~ cellType)+ theme(legend.position="none") + ylab(bquote(d^(TF)))
 
-ggplot(cad_tfs_degree_hard_thresh_melted) + geom_violin(aes(x = cellType, y = tf_diff_degree, col = cellType),) + theme_classic()+ scale_color_manual(values=pallet)+ xlab("Individual") #+ theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())  + labs(y = "Scaled TF disruption score", title = "CAD genes",col = "Cell type",shape = "TF") 
+disease_test_tfs_degree_hard_thresh <- data[which(data$GWAS_CD == 1),c(1:358)]
+disease_test_tfs_degree_hard_thresh_melted <- melt(disease_test_tfs_degree_hard_thresh)
+colnames(disease_test_tfs_degree_hard_thresh_melted) <- c("tf","sample","tf_diff_degree")
+disease_test_tfs_degree_hard_thresh_melted <- separate(disease_test_tfs_degree_hard_thresh_melted, sample, c("cellType","tag", "indiv"), "_", remove = TRUE)
 
-p1b <- ggplot(cad_tfs_degree_hard_thresh_melted) + geom_point(shape = 19, aes(x = reorder(indiv, -tf_diff_degree), y = tf_diff_degree, col = cellType),) + theme_classic()+ scale_color_manual(values=pallet)+ xlab("Individual") + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())  + labs(y = "Scaled TF disruption score", title = "CAD genes",col = "Cell type",shape = "TF")  + facet_grid(. ~ cellType)
+cd_plot <- ggplot(disease_test_tfs_degree_hard_thresh_melted) + geom_point(shape = 19, aes(x = reorder(indiv, -tf_diff_degree), y = tf_diff_degree, col = cellType),) + theme_classic()+ scale_color_manual(values=pallet)+ xlab("Individual") + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())  + labs(title = "CD TFs",col = "Cell type",shape = "TF") + facet_grid(. ~ cellType)+ theme(legend.position="none") + ylab(bquote(d^(TF)))
 
-p2 <- ggplot(cad_tfs_degree_hard_thresh_melted[cad_tfs_degree_hard_thresh_melted$tf_diff_degree>3,]) + geom_point(size = 3, aes(x = reorder(indiv, -tf_diff_degree), y = tf_diff_degree, col = cellType, size = cellType, shape = tf)) +  theme_classic()+ scale_color_manual(values=pallet)+ xlab("Individual") + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())  + labs(y = "Scaled TF disruption score", title = "Top (d' > 3) CAD genes",col = "Cell type",shape = "TF")  
+cad_annotated <- annotate_figure(cad_plot,fig.lab = "A", fig.lab.face = "plain", fig.lab.pos = "top.left", fig.lab.size = 14)
+cd_annotated <- annotate_figure(cd_plot,fig.lab = "B", fig.lab.face = "plain", fig.lab.pos = "top.left", fig.lab.size = 14)
 
-p2b <- ggplot(cad_tfs_degree_hard_thresh_melted[cad_tfs_degree_hard_thresh_melted$tf_diff_degree>3,]) + geom_point(size = 2, aes(x = reorder(indiv, -tf_diff_degree), y = tf_diff_degree, col = cellType, size = cellType, shape = tf)) +  theme_classic()+ scale_color_manual(values=pallet)+ xlab("Individual") + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())  + labs(y = "Scaled TF disruption score", title = "Top (d' > 3) CAD genes",col = "Cell type",shape = "TF")  + facet_grid(. ~ cellType)
-#dev.off()
+combined_plot <- grid.arrange(cad_annotated, cd_annotated, nrow=2, heights = c(3,3))
+combined_plot_annotated <- annotate_figure(combined_plot,top = text_grob("TF disruption scores for disease-related TFs", color = "black", face = "bold", size = 14))
 
-
-
-
-p3 <- grid.arrange(p1 + theme(legend.position="none"), p2 + theme(legend.position="right"), nrow=1, widths = c(3,4))
-p4 <- annotate_figure(p3,top = text_grob("TF disruption scores for CAD genes", color = "black", face = "bold", size = 14))
-
-pdf("../figures/top_d_cad_genes.pdf",width = 8, height = 3)
-plot(p4)
+pdf("../figures/disease_tfs_disruptionscore_plot.pdf",width = 6, height = 4)
+plot(combined_plot_annotated)
 dev.off()
-plot(p4)
 
-p3b <- grid.arrange(p1b + theme(legend.position="none"), p2b + theme(legend.position="none"), nrow=2)
-p4b <- annotate_figure(p3b,top = text_grob("TF disruption scores for CAD genes", color = "black", face = "bold", size = 14))
+```
 
-pdf("../figures/top_d_cad_genes_facets.pdf",width = 8, height = 5)
-plot(p4b)
-dev.off()
-plot(p4b)
-
+```{r}
 # which individuals have the ipsc cm disruptions for ERG
 indivs_high_erg_disrup <- cad_tfs_degree_hard_thresh_melted[which((cad_tfs_degree_hard_thresh_melted$tf_diff_degree>3) & (cad_tfs_degree_hard_thresh_melted$cellType == "iPSC-CM")),c('indiv','tf_diff_degree')]
 indivs_high_erg_disrup
@@ -374,52 +340,12 @@ tf_disrup_erg_cm <- cad_tfs_degree_hard_thresh_melted[which((cad_tfs_degree_hard
 This is the eQTL for ERG
 ERG	ENSG00000159176	201476815	chr1	0.461
 
-gene ENSG00000159176 is associated with some ehart disease
-https://www.genecards.org/cgi-bin/carddisp.pl?gene=CSRP1
-
-https://www-sciencedirect-com.ezp-prod1.hul.harvard.edu/science/article/pii/S1534580702003969
-
-TF disruption scores for CD genes
-
-```{r}
-data <- tf_degrees_hard_thresh_scaled
-disease_test_tfs_degree_hard_thresh <- data[which(data$GWAS_CD   == 1),c(1:358)]
-disease_test_tfs_degree_hard_thresh_melted <- melt(disease_test_tfs_degree_hard_thresh)
-colnames(disease_test_tfs_degree_hard_thresh_melted) <- c("tf","sample","tf_diff_degree")
-disease_test_tfs_degree_hard_thresh_melted <- separate(disease_test_tfs_degree_hard_thresh_melted, sample, c("cellType","tag", "indiv"), "_", remove = TRUE)
-
-p1 <- ggplot(disease_test_tfs_degree_hard_thresh_melted) + geom_point(shape = 19, aes(x = reorder(indiv, -tf_diff_degree), y = tf_diff_degree, col = cellType),) + theme_classic()+ scale_color_manual(values=pallet)+ xlab("Individual") + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())  + labs(y = "Scaled TF disruption score", title = "CD genes",col = "Cell type",shape = "TF")
-
-p1b <- ggplot(disease_test_tfs_degree_hard_thresh_melted) + geom_point(shape = 19, aes(x = reorder(indiv, -tf_diff_degree), y = tf_diff_degree, col = cellType),) + theme_classic()+ scale_color_manual(values=pallet)+ xlab("Individual") + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())  + labs(y = "Scaled TF disruption score", title = "CD genes",col = "Cell type",shape = "TF") + facet_grid(. ~ cellType)
-
-p2 <- ggplot(disease_test_tfs_degree_hard_thresh_melted[disease_test_tfs_degree_hard_thresh_melted$tf_diff_degree >3,]) + geom_point(size = 3, aes(x = reorder(indiv, -tf_diff_degree), y = tf_diff_degree, col = cellType, shape = tf)) +  theme_classic()+ scale_color_manual(values=pallet[3])+xlab("Individual") + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())  + labs(y = "Scaled TF disruption score", title = "Top (d' > 3) CD genes",col = "Cell type",shape = "TF") + facet_grid(. ~ cellType)
-
-p2b <- ggplot(disease_test_tfs_degree_hard_thresh_melted[disease_test_tfs_degree_hard_thresh_melted$tf_diff_degree >3,]) + geom_point(size = 3, aes(x = reorder(indiv, -tf_diff_degree), y = tf_diff_degree, col = cellType, shape = tf)) +  theme_classic()+ scale_color_manual(values=pallet[3])+xlab("Individual") + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())  + labs(y = "Scaled TF disruption score", title = "Top (d' > 3) CD genes",col = "Cell type",shape = "TF") 
-
-
-p3 <- grid.arrange(p1 + theme(legend.position="right"), p2 + theme(legend.position="right"), nrow=1, widths = c(5,5))
-p4 <- annotate_figure(p3,top = text_grob("TF disruption scores for CD genes", color = "black", face = "bold", size = 14))
-
-p3b <- grid.arrange(p1b + theme(legend.position="none"), p2b + theme(legend.position="none"), nrow=2)
-p4b <- annotate_figure(p3b,top = text_grob("TF disruption scores for CD genes", color = "black", face = "bold", size = 14))
-
-pdf("../figures/top_d_cd_genes.pdf",width = 8, height = 3)
-plot(p4)
-dev.off()
-plot(p4)
-
-pdf("../figures/top_d_cd_genes_facet.pdf",width = 8, height = 5)
-plot(p4b)
-dev.off()
-plot(p4b)
-```
-
 # ALPACA analysis
 
 ## Run alpaca
 Use the Rmd's to run alpaca
 
-- ../scripts/run_alpaca.Rmd  
+- ../scripts/run_alpaca_LCL.Rmd  
 - ../scripts/run_alpaca_iPSC-CM.Rmd  
 - ../scripts/run_alpaca_iPSC.Rmd
 
@@ -494,25 +420,34 @@ load("../alpaca/iPSC-CM_alpaca_score_table_genes.RData")
 
 pre_merged_alpaca_table <- merge(alpaca_score_table_LCL,alpaca_score_table_iPSC, by.x = c(1), by.y = c(1), all = FALSE)
 merged_alpaca_table <- merge(pre_merged_alpaca_table,alpaca_score_table_iPSCCM,by.x = c(1), by.y = c(1), all = FALSE)
-#save(merged_alpaca_table, file = "../alpaca/merged_alpaca_table_07302020_genes.RData")
+save(merged_alpaca_table, file = "../alpaca/merged_alpaca_table_07302020_genes.RData")
 load("../alpaca/merged_alpaca_table_07302020_genes.RData")
 ```
 
-## scale and plot distributions
+## Scale ALPACA scores
 
 ```{r}
-
 merged_alpaca_table_qq <- cbind(merged_alpaca_table[,c(1)],as.data.frame(normalize.quantiles(as.matrix(merged_alpaca_table[,c(2:358)]))))
 colnames(merged_alpaca_table_qq) <- colnames(merged_alpaca_table)
 
 merged_alpaca_table_qq_sc <- cbind(merged_alpaca_table_qq[,c(1)],as.data.frame(t(scale(t(merged_alpaca_table_qq[,c(2:358)]), center = TRUE, scale = TRUE))))
 colnames(merged_alpaca_table_qq_sc)[1] <- "node"
+
+
+melted_alpaca <- melt(merged_alpaca_table_qq_sc)
+colnames(melted_alpaca) <- c("node","sample","alpaca_score")
+melted_alpaca <- separate(melted_alpaca, sample, c("cellType","tag", "indiv"), "_", remove = TRUE)
+melted_alpaca$cellType[which(melted_alpaca$cellType == "iPSCCM")] <- "iPSC-CM"
+alpaca_dist <- ggplot(melted_alpaca) + geom_violin(aes(x = cellType, y = (alpaca_score), fill = cellType, col = cellType)) + theme_classic()+ scale_fill_manual(values=pallet) + scale_color_manual(values=pallet)+ labs(y = "DM score",x = "Cell type", title = "Gene DM scores") + theme(legend.position = "none") 
+alpaca_dist
+pdf("../figures/alpaca_dist.pdf",width = 3, height = 3)
+plot(alpaca_dist)
+dev.off()
+
 ```
 
+## Plots of ALPACA scores for top disease genes in relevant cell type
 
-## Plots of alpaca scores for top disease genes in relevant cell type
-
-CAD
 ```{r}
 data <- merged_alpaca_table_qq_sc
 only_CAD_genes <- as.vector(CAD$gene)[which(!((as.vector(CAD$gene) %in% as.vector(CD$gene))))]
@@ -520,72 +455,41 @@ cads <- data[which(data$node %in% CAD$gene),c(1:358)]
 cads_melted <- melt(cads)
 colnames(cads_melted) <- c("node","sample","alpaca_score")
 cads_melted <- separate(cads_melted, sample, c("cellType","tag", "indiv"), "_", remove = TRUE)
-
-ggplot(cads_melted) + geom_point(shape = 21, aes(x =indiv, y = (alpaca_score), col = cellType, fill = cellType, alpha = 0.1)) + theme_classic()#+ scale_color_manual(values=pallet)+scale_fill_manual(values=pallet) + xlab("Individual")
-ggplot(cads_melted) + geom_violin(aes(x = cellType, y = (alpaca_score), fill = cellType, col = cellType)) + theme_classic()+ scale_fill_manual(values=pallet) + scale_color_manual(values=pallet)+ labs(y = "ALPACA score",col = "Cell type") + theme(legend.position = "none") 
-
-
-data <- merged_alpaca_table_qq_sc
-high_score_nodes_cad <- unique(cads_melted[which(((cads_melted$alpaca_score) > 1.7) & (cads_melted$cellType == "iPSCCM")),'node'])
+cads_melted$cellType[which(cads_melted$cellType == "iPSCCM")] <- "iPSC-CM"
+high_score_nodes_cad <- unique(cads_melted[which(((cads_melted$alpaca_score) > 1.7) & (cads_melted$cellType == "iPSC-CM")),'node'])
 cads <- data[which(data$node %in% high_score_nodes_cad),c(1:358)]
 cads_melted <- melt(cads)
 colnames(cads_melted) <- c("node","sample","alpaca_score")
 cads_melted <- separate(cads_melted, sample, c("cellType","tag", "indiv"), "_", remove = TRUE)
-
-p1 <- ggplot(cads_melted) + geom_point(size = 2,alpha = 0.4,aes(x = reorder(indiv, -alpaca_score), y = (alpaca_score), col = cellType,  shape = node)) + theme_classic()+ scale_color_manual(values=pallet)  + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())+ labs(y = "ALPACA score",col = "Cell type",shape = "TF", x= "Individual") 
-
-p1b <- ggplot(cads_melted) + geom_violin(aes(x = cellType, y = (alpaca_score), fill = cellType, col = cellType)) + theme_classic()+ scale_fill_manual(values=pallet) + scale_color_manual(values=pallet)+ labs(y = "ALPACA score",col = "Cell type") + theme(legend.position = "none") 
-
-
-p2 <- annotate_figure(p1,top = text_grob("ALPACA scores for top CAD TFs in iPSC-CMs", color = "black", face = "bold", size = 14))
-p2b <- annotate_figure(p1b,top = text_grob("Top CAD TFs in iPSC-CMs", color = "black", face = "bold", size = 14))
-
-pdf("../figures/banovich_topCAD_ipsc.pdf",width = 5, height = 3.5)
-plot(p2)
-dev.off()
-plot(p2)
-
-pdf("../figures/banovich_topCAD_ipsc_violin.pdf",width = 3.5, height = 3.5)
-plot(p2b)
-dev.off()
-```
+cads_melted$cellType[which(cads_melted$cellType == "iPSCCM")] <- "iPSC-CM"
+cad_alpaca_plot <- ggplot(cads_melted) + geom_violin(aes(x = cellType, y = (alpaca_score), fill = cellType, col = cellType)) + theme_classic()+ scale_fill_manual(values=pallet) + scale_color_manual(values=pallet)+ labs(y = "DM score",x = "Cell type", title = "Top CAD genes in CMs") + theme(legend.position = "none") 
+cad_alpaca_plot <- annotate_figure(cad_alpaca_plot,fig.lab = "A", fig.lab.face = "plain", fig.lab.pos = "top.left", fig.lab.size = 14)
 
 
-
-CD
-```{r}
-data <- merged_alpaca_table_qq_sc
 only_CD_genes <- as.vector(CD$gene)[which(!((as.vector(CD$gene) %in% as.vector(CAD$gene))))]
 cds <- data[which(data$node %in% CD$gene),c(1:358)]
 cds_melted <- melt(cds)
 colnames(cds_melted) <- c("node","sample","alpaca_score")
 cds_melted <- separate(cds_melted, sample, c("cellType","tag", "indiv"), "_", remove = TRUE)
-
-ggplot(cds_melted) + geom_point(shape = 21, aes(x =indiv, y = abs(alpaca_score), col = cellType, fill = cellType, alpha = 0.1)) + theme_classic()+ scale_color_manual(values=pallet)+scale_fill_manual(values=pallet) + xlab("Individual")
-
 high_score_nodes_cd <- unique(cds_melted[which((abs(cds_melted$alpaca_score) > 1.7) & (cds_melted$cellType == "LCL")),'node'])
 cds <- data[which(data$node %in% high_score_nodes_cd),c(1:358)]
 cds_melted <- melt(cds)
 colnames(cds_melted) <- c("node","sample","alpaca_score")
 cds_melted <- separate(cds_melted, sample, c("cellType","tag", "indiv"), "_", remove = TRUE)
-
-p1 <- ggplot(cds_melted) + geom_point(size = 2,alpha = 0.4,aes(x = reorder(indiv, -alpaca_score), y = (alpaca_score), col = cellType,  shape = node)) + theme_classic()+ xlab("Individual")+ theme_classic()+ scale_color_manual(values=pallet)  + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())+ labs(y = "ALPACA score",color = "Cell type",shape = "TF", x= "Individual")
-
-p1b <- ggplot(cds_melted) + geom_violin(aes(x = cellType, y = (alpaca_score), fill = cellType, col = cellType)) + theme_classic()+ scale_fill_manual(values=pallet) + scale_color_manual(values=pallet)+ labs(y = "ALPACA score",col = "Cell type") + theme(legend.position = "none") 
-
+cds_melted$cellType[which(cds_melted$cellType == "iPSCCM")] <- "iPSC-CM"
+cd_alpaca_plot <- ggplot(cds_melted) + geom_violin(aes(x = cellType, y = (alpaca_score), fill = cellType, col = cellType)) + theme_classic()+ scale_fill_manual(values=pallet) + scale_color_manual(values=pallet)+ labs(y = "DM score",x = "Cell type", title  = "Top CD genes in LCLs") + theme(legend.position = "none") 
+cd_alpaca_plot <- annotate_figure(cd_alpaca_plot,fig.lab = "B", fig.lab.face = "plain", fig.lab.pos = "top.left", fig.lab.size = 14)
 
 
-p2 <- annotate_figure(p1,top = text_grob("ALPACA scores for top CD genes in LCLs", color = "black", face = "bold", size = 14))
-p2b <- annotate_figure(p1b,top = text_grob("Top CD TFs in LCLs", color = "black", face = "bold", size = 14))
-pdf("../figures/banovich_topCD_lcl.pdf",width = 5, height = 3.5)
-plot(p2)
-dev.off()
-plot(p2)
+combined_plot <- grid.arrange(cad_alpaca_plot, cd_alpaca_plot, nrow=1, widths = c(3,3))
+combined_plot_annotated <- annotate_figure(combined_plot,top = text_grob("Distribution of differential modularity scores", color = "black", face = "bold", size = 14))
 
-pdf("../figures/banovich_topCD_lcl_violin.pdf",width = 3.5, height = 3.5)
-plot(p2b)
+
+pdf("../figures/alpaca_scores.pdf",width = 6, height = 3)
+plot(combined_plot_annotated)
 dev.off()
 ```
+
 
 ## Example - individuals with mutation in ERG binding site affecting expression of CSRP1
 ```{r}
@@ -596,47 +500,34 @@ genes <- data[which(data$node == gene),c(1:358)]
 genes_melted <- melt(genes)
 colnames(genes_melted) <- c("node","sample","alpaca_score")
 genes_melted <- separate(genes_melted, sample, c("cellType","tag", "indiv"), "_", remove = TRUE)
-#genes_melted$tds <- ifelse(genes_melted$indiv %in% indivs_high_erg_disrup$indiv, "high","low")
 genes_melted$tds <- tf_disrup_erg_cm$tf_diff_degree[match(genes_melted$indiv,tf_disrup_erg_cm$indiv)]
 genes_melted$dosage <- as.numeric(as.vector(c(as.vector(geno[1,c(10:128)]),as.vector(geno[1,c(10:128)]),as.vector(geno[1,c(10:128)]))))
 
-p1 <- ggplot(genes_melted[which(genes_melted$cellType == "iPSCCM"),]) + geom_point(shape = 21,aes(x = reorder(indiv, -alpaca_score), y = (alpaca_score), fill = dosage, size = tds)) + theme_classic()+ scale_fill_gradient(low = "white", high = "#870E75") + theme(axis.text.x=element_blank(), axis.ticks.x=element_blank())+ labs(y = "ALPACA score",fill = "Alt. dosage",size = "ERG TF d'", x= "Individual") 
+p1 <- ggplot(genes_melted[which(genes_melted$cellType == "iPSCCM"),]) + geom_point(shape = 21,aes(x = reorder(indiv, -alpaca_score), y = (alpaca_score), fill = dosage, size = tds)) + theme_classic()+ scale_fill_gradient(low = "white", high = "#870E75") + theme(axis.text.x=element_blank(), axis.ticks.x=element_blank())+ labs(y = "DM score",fill = "Alt. dosage",size = "ERG TF d'", x= "Individual") 
 
-p2 <- annotate_figure(p1,top = text_grob("ALPACA scores for CSRP1 (ENSG00000159176)", color = "black", face = "bold", size = 14))
-pdf("../figures/banovich_example_gene_alpaca_dosage_and_tfds.pdf",width = 5, height = 4)
+p2 <- annotate_figure(p1,top = text_grob("DM scores for CSRP1 (ENSG00000159176)", color = "black", face = "bold", size = 14))
+pdf("../figures/example_gene_alpaca_dosage_and_tfds.pdf",width = 4, height = 3.8)
 plot(p2)
 dev.off()
 
 plot(p2)
- #ggplot(genes_melted) + geom_point(size = 2,alpha = 0.4,aes(x = reorder(indiv, -alpaca_score), y = (alpaca_score), col = cellType,  shape = tds)) + theme_classic()+ scale_color_manual(values=pallet)  + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())+ labs(y = "ALPACA score",col = "Cell type",shape = "TF", x= "Individual") 
 ```
 
 
-# averages of gene alpaca scores for GO enrichment
+# Gene alpaca scores for GO enrichment - individual 18
 ```{r}
-means_ipscCM <- rowMeans(alpaca_score_table_iPSCCM[,c(2:120)])
-names(means_ipscCM) <- alpaca_score_table_iPSCCM$node
-write.table(names(means_ipscCM[order(-means_ipscCM)]), file = "../alpaca/means_genes_alpaca_ipsc_cm.txt", sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
-
-write.table(as.vector(alpaca_score_table_iPSCCM[order(-alpaca_score_table_iPSCCM$iPSCCM_indiv_11),1]),file = "gene_alpaca_ipsc_cm_indiv_11.txt", sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
-
-write.table(as.vector(alpaca_score_table_iPSCCM[order(-alpaca_score_table_iPSCCM$iPSCCM_indiv_18),1]),file = "gene_alpaca_ipsc_cm_indiv_18.txt", sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+write.table(as.vector(alpaca_score_table_iPSCCM[order(-alpaca_score_table_iPSCCM$iPSCCM_indiv_18),1]),file = "../go/gene_alpaca_ipsc_cm_indiv_18.txt", sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
 ```
 
 ```{r}
-means_LCL <- rowMeans(alpaca_score_table_LCL[,c(2:120)])
-names(means_LCL) <- alpaca_score_table_LCL$node
-write.table(names(means_LCL[order(-means_LCL)]), file = "../alpaca/means_genes_alpaca_lcl.txt", sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
-write.table(as.vector(alpaca_score_table_LCL[order(-alpaca_score_table_LCL$LCL_indiv_18),1]),file = "gene_alpaca_lcl_indiv_18.txt", sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+write.table(as.vector(alpaca_score_table_LCL[order(-alpaca_score_table_LCL$LCL_indiv_18),1]),file = "../go/gene_alpaca_lcl_indiv_18.txt", sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
 ```
 
 ```{r}
-means_ipsc <- rowMeans(alpaca_score_table_iPSC[,c(2:120)])
-names(means_ipsc) <- alpaca_score_table_iPSC$node
-write.table(names(means_ipsc[order(-means_ipsc)]), file = "../alpaca/means_genes_alpaca_ipsc.txt", sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
-write.table(as.vector(alpaca_score_table_iPSC[order(-alpaca_score_table_iPSC$iPSC_indiv_18),1]),file = "gene_alpaca_ipsc_indiv_18.txt", sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+write.table(as.vector(alpaca_score_table_iPSC[order(-alpaca_score_table_iPSC$iPSC_indiv_18),1]),file = "../go/gene_alpaca_ipsc_indiv_18.txt", sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
 ```
 
+GO enrichment was performed on the above ranked lists using GOrilla (http://cbl-gorilla.cs.technion.ac.il/). The code below creates the GO term plots. Because there are many terms enriched only in CMs making plotting diffifult for a main text figure, for terms enriched only in CMs, we plot only those terms we wish to discuss in the main text figure, and include a full plot of all terms as a suplemental figure. Both of these figures (reduced figure and full figure) are produced below:
 
 plot go terms
 cat GO_indiv18_lcl.txt | tr '^M' '\n' | grep "^GO:" >formatted_GO_indiv18_lcl.txt
@@ -663,32 +554,19 @@ only_cm <- go_cm$Description[which((!(go_cm$Description %in% go_lcl$Description)
 only_lcl <- go_lcl$Description[which((!(go_lcl$Description %in% go_cm$Description)) & (!(go_lcl$Description %in% go_ipsc$Description)))]
 only_ipsc <- go_ipsc$Description[which((!(go_ipsc$Description %in% go_lcl$Description)) & (!(go_ipsc$Description %in% go_cm$Description)))]
 
-bold <- read.table("../go/bold", header = FALSE, sep = "\t")
-terms_no_plot <- go_enrich$Description[which(!(go_enrich$Description %in% terms_to_plot$V1))]
 go_enrich_plot <- go_enrich[which(go_enrich$Description %in% terms_to_plot$V1),]
-go_enrich_plot$bold <- ifelse(go_enrich_plot$Description %in% bold$V1, "bold", "plain")
 go_enrich_plot$color <- 'black'
 go_enrich_plot$color[which(go_enrich_plot$Description %in% only_cm)] <- '#870E75'
 go_enrich_plot$color[which(go_enrich_plot$Description %in% only_lcl)] <- '#0BB19F'
 go_enrich_plot$color[which(go_enrich_plot$Description %in% only_ipsc)] <- '#FFBF00'
 ```
 
-pallet <- c("#FFBF00",  "#870E75"  ,  "#0BB19F" )
-#amber, magenta, teal
-
-```{r}
-library(ggplot2)
-library(dplyr)
-library(ggthemes)
-library(forcats)
-```
 
 ```{r}
 color <- factor(unique(go_enrich_plot[,c("Description", "color")])$color, levels = c("black","#FFBF00","#0BB19F", "#870E75"))
 go_enrich_plot$color2 <- color[match(go_enrich_plot$color, color)]
 order <- with(unique(go_enrich_plot[,c("Description", "color2")]), order(color2))
 
-#go_enrich_plot$Description <- reorder(go_enrich_plot$Description, order)
 Description <- factor(unique(go_enrich_plot[,c("Description", "color2")])$Description, levels = unique(go_enrich_plot[,c("Description", "color2")])[order,"Description"])
 go_enrich_plot$Description2 <- Description[match(go_enrich_plot$Description, Description)]
  #
@@ -696,7 +574,6 @@ go_enrich_plot$celltype <- factor(go_enrich_plot$celltype, levels = c("CM","LCL"
 
 p <- ggplot(go_enrich_plot, aes(x=-log10(Pvalue), y=Description2, colour=celltype, group = celltype, size=b)) + geom_point() + expand_limits(x=0) + labs(x="-log10(P-value)", y="GO term", colour="P value", size="Count") + theme_few() + scale_color_manual(values=pallet[c(2,3,1)]) +  facet_wrap(~celltype)
 y_labs <- ggplot_build(p)$layout$panel_params[[1]]$y$get_labels()
-#bold_vec <- ifelse(y_labs %in% bold$V1, "bold", "plain")
 col_vec <- as.vector(go_enrich_plot$color2)[match(y_labs,go_enrich_plot$Description2)]
 
 p <- p + theme(axis.text.y = element_text(colour = col_vec)) + scale_x_continuous(name="-log10(p-value)",limits=c(1, 8))
@@ -716,7 +593,6 @@ color <- factor(unique(go_enrich[,c("Description", "color")])$color, levels = c(
 go_enrich$color2 <- color[match(go_enrich$color, color)]
 order <- with(unique(go_enrich[,c("Description", "color2")]), order(color2))
 
-#go_enrich_plot$Description <- reorder(go_enrich_plot$Description, order)
 Description <- factor(unique(go_enrich[,c("Description", "color2")])$Description, levels = unique(go_enrich[,c("Description", "color2")])[order,"Description"])
 go_enrich$Description2 <- Description[match(go_enrich$Description, Description)]
  #
@@ -724,7 +600,6 @@ go_enrich$celltype <- factor(go_enrich$celltype, levels = c("CM","LCL","iPSC"))
 
 p <- ggplot(go_enrich, aes(x=-log10(Pvalue), y=Description2, colour=celltype, group = celltype, size=b)) + geom_point() + expand_limits(x=0) + labs(x="-log10(P-value)", y="GO term", colour="P value", size="Count") + theme_few() + scale_color_manual(values=pallet[c(2,3,1)]) +  facet_wrap(~celltype)
 y_labs <- ggplot_build(p)$layout$panel_params[[1]]$y$get_labels()
-#bold_vec <- ifelse(y_labs %in% bold$V1, "bold", "plain")
 col_vec <- as.vector(go_enrich$color2)[match(y_labs,go_enrich$Description2)]
 
 p <- p + theme(axis.text.y = element_text(colour = col_vec)) + scale_x_continuous(name="-log10(p-value)")
