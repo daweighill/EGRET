@@ -184,6 +184,7 @@ load("../outputs/validation_table_k562_10142020.RData")
 # Plot distributions
 We plot the distribution of the edge disruption scores for K562 and GM12878.
 ```{r}
+# violin plot of complete distributions
 colnames(validation_table_gm12878) <- c("id","tf","gene","panda","egret_gm12878","chipseq_gm12878","diff_gm12878")
 colnames(validation_table_k562) <- c("id","tf","gene","panda","egret_k562","chipseq_k562","diff_k562")
 combined_table <- join(validation_table_gm12878,validation_table_k562,by = c("id","tf","gene"),type="inner")
@@ -193,12 +194,19 @@ colnames(combined_table)[which(colnames(combined_table) == 'diff_gm12878')] <- "
 colnames(combined_table)[which(colnames(combined_table) == 'diff_k562')] <- "K562"
 dis_melted <- melt(combined_table[,c('id','GM12878','K562')], id.vars = 'id')
 colnames(dis_melted) <- c("edge","cell_line","d")
-p1 <- ggplot(dis_melted, aes(x=cell_line, y = d, group = cell_line, col = cell_line)) + geom_violin() + theme_bw() + scale_color_manual(values=pallet[c(3,2)]) + scale_fill_manual(values=pallet[c(3,2)]) +labs(title="Distribution of edge disruption scores", x ="Genotype", y = "Edge disruption score") + theme(legend.position = "none")
-            
-pdf("../figures/edge_disrup_score_cell_lines.pdf",width = 3.5, height = 3)
-plot(p1)
-dev.off()
 
+p1 <- ggplot(dis_melted, aes(x=cell_line, y = d, group = cell_line, col = cell_line)) + geom_violin() + theme_bw() + scale_color_manual(values=pallet[c(3,2)]) + scale_fill_manual(values=pallet[c(3,2)]) +labs(x ="Genotype", y = "Edge disruption score") + theme(legend.position = "none")
+p1 <- annotate_figure(p1,fig.lab = "A", fig.lab.face = "plain", fig.lab.pos = "top.left", fig.lab.size = 14)
+           
+# Log boxplot to see quantiles
+p2 <- ggplot(dis_melted, aes(x=cell_line, y = log(d), group = cell_line, col = cell_line)) + geom_boxplot() + theme_bw() + scale_color_manual(values=pallet[c(3,2)]) + scale_fill_manual(values=pallet[c(3,2)]) +labs(x ="Genotype", y = "log10(Edge disruption score)") + theme(legend.position = "none") 
+p2 <- annotate_figure(p2,fig.lab = "B", fig.lab.face = "plain", fig.lab.pos = "top.left", fig.lab.size = 14) 
+
+p3 <- grid.arrange(p1 + theme(legend.position="none"), p2 + theme(legend.position="none"), nrow=1, widths = c(4,4))
+p4 <- annotate_figure(p3,top = text_grob("Distribution of edge disruption scores", color = "black", face = "bold", size = 14))
+pdf("../figures/edge_disrup_score_cell_lines.pdf",width = 6, height = 3)
+plot(p4)
+dev.off()
 ```
 
 # Select examples for visualizing in genome browser
@@ -383,9 +391,6 @@ combined_table_all$caqtl_k <- ifelse(combined_table_all$id %in% caqtl_k$edge_id,
 combined_table_all$caqtl_g <- ifelse(combined_table_all$id %in% caqtl_g$edge_id,1,0)
 ```
 
-
-
-
 # Performance (AUC-ROCs) of ChIP-seq prediction
 Calculate AUC-ROCs of prediction of ChIP-seq network from EGRET edge scores, for different cutoffs of edge disruption score. Tables indicating the AUC-ROC improvement and its statistical significance are printed.
 
@@ -509,8 +514,8 @@ edited_gm12878 <- read.table("../outputs/edge_modifications_EGRET_allQBiCModels_
 dim(edited_gm12878)
 colnames(edited_gm12878) <- c("tf","gene","id","mod")
 
-p1 <- ggplot(edited_gm12878, aes(x=mod)) + geom_density(fill=pallet[3], col = pallet[3]) + theme_bw() + scale_color_manual(values=pallet) + scale_fill_manual(values=pallet) +labs(title="GM12878", x ="Prior modification qAB", y = "Frequency fraction")
-
+p1 <- ggplot(edited_gm12878, aes(x=mod)) + geom_density(fill=pallet[3], col = pallet[3]) + theme_bw() + scale_color_manual(values=pallet) + scale_fill_manual(values=pallet) +labs(title="GM12878", x ="Prior modification qAB", y = "Density")
+p1 <- annotate_figure(p1,fig.lab = "A", fig.lab.face = "plain", fig.lab.pos = "top.left", fig.lab.size = 14)
 
 edited_gm12878_chip <- edited_gm12878[which(edited_gm12878$tf %in% chipseq_regnet_gm12878$tf),]
 edited_gm12878_chip$chipseq <- ifelse(edited_gm12878_chip$id %in% chipseq_regnet_gm12878$id, 1, 0)
@@ -527,12 +532,12 @@ edited_k562 <- read.table("../outputs/edge_modifications_EGRET_allQBiCModels_k56
 dim(edited_k562)
 colnames(edited_k562) <- c("tf","gene","id","mod")
 
-p2 <- ggplot(edited_k562, aes(x=mod)) + geom_density(fill=pallet[2], col = pallet[2]) + theme_bw() + scale_color_manual(values=pallet) + scale_fill_manual(values=pallet) +labs(title="K562", x ="Prior modification qAB", y = "Frequency fraction")
-p2
+p2 <- ggplot(edited_k562, aes(x=mod)) + geom_density(fill=pallet[2], col = pallet[2]) + theme_bw() + scale_color_manual(values=pallet) + scale_fill_manual(values=pallet) +labs(title="K562", x ="Prior modification qAB", y = "Density")
+p2 <- annotate_figure(p2,fig.lab = "A", fig.lab.face = "plain", fig.lab.pos = "top.left", fig.lab.size = 14)
 p3 <- grid.arrange(p1 + theme(legend.position="none"), p2 + theme(legend.position="none"), nrow=1, widths = c(4,4))
 #p3
 
-p4 <- annotate_figure(p3,top = text_grob("Prior modification distributions (all QBiC models)", color = "black", face = "bold", size = 14))
+p4 <- annotate_figure(p3,top = text_grob("Prior modification distributions", color = "black", face = "bold", size = 14))
 pdf("../figures/modification_distribution_allQBiCModels.pdf",width = 6, height = 4)
 plot(p4)
 dev.off()

@@ -30,3 +30,41 @@ while (<FILE>)
 }
 close FILE;
 close OUT;
+
+system("grep ARID3A ../chipseq/GM12878_remap2018_all_macs2_hg19_v1_2.bed >../viz/ARID3A_gm12878.bed");
+system("grep ARID3A ../chipseq/K562_remap2018_all_macs2_hg19_v1_2.bed >../viz/ARID3A_k562.bed");
+system("grep RELA ../chipseq/K562_remap2018_all_macs2_hg19_v1_2.bed >../viz/RELA_k562.bed");
+system("grep RELA ../chipseq/GM12878_remap2018_all_macs2_hg19_v1_2.bed >../viz/RELA_gm12878.bed");
+
+open FILE, "../genotype_data/NA12878.vcf";
+open OUT, ">../viz/NA12878_vcf.bed";
+while (<FILE>)
+{
+	if ($_ !~ /#/)
+	{
+		chomp $_;
+		my @line = split /\t/, $_;
+		my $start = $line[1]-1;
+		my $name = "$line[3]_$line[4]";
+		print OUT "$line[0]\t$start\t$line[1]\t$name\n";
+	}
+}
+close FILE;
+close OUT;
+
+open FILE, "../genotype_data/k562.vcf";
+open OUT, ">../viz/K562_vcf.bed";
+while (<FILE>)
+{
+	if ($_ !~ /#/)
+	{
+		chomp $_;
+		my @line = split /\t/, $_;
+		my $start = $line[1]-1;
+		my $name = "$line[3]_$line[4]";
+		print OUT "$line[0]\t$start\t$line[1]\t$name\n";
+	}
+}
+close FILE;
+close OUT;
+

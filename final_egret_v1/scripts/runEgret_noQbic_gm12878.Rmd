@@ -162,5 +162,5 @@ mclapply(processes, function(p) {
   filename <- paste0("../outputs/",tag,"_",prior_names[p],".RData")
   regnet <- results@regNet
   save(regnet, file = filename)
-d}, mc.cores = 1,mc.preschedule=TRUE)
+}, mc.cores = 1,mc.preschedule=TRUE)
 ```

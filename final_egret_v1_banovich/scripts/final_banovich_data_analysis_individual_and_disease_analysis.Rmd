@@ -233,6 +233,7 @@ save(gene_degrees_hard_thresh,file = "../outputs/gene_degrees_hard_thresh_035.RD
 ## Scale and plot distributions
 
 ```{r}
+load("../outputs/tf_degrees_hard_thresh_035.RData")
 tf_degrees_hard_thresh_scaled <- scale(tf_degrees_hard_thresh[,c(2:358)], center = TRUE, scale = TRUE)
 tf_degrees_hard_thresh_scaled <- cbind(tf_degrees_hard_thresh[,c(1)], tf_degrees_hard_thresh_scaled, tf_degrees_hard_thresh[,c(359:360)])
 colnames(tf_degrees_hard_thresh_scaled)[1] <-"tf"
@@ -307,35 +308,38 @@ cad_tfs_degree_hard_thresh <- data[which(data$GWAS_CAD_tf == 1),c(1:358)]
 cad_tfs_degree_hard_thresh_melted <- melt(cad_tfs_degree_hard_thresh)
 colnames(cad_tfs_degree_hard_thresh_melted) <- c("tf","sample","tf_diff_degree")
 cad_tfs_degree_hard_thresh_melted <- separate(cad_tfs_degree_hard_thresh_melted, sample, c("cellType","tag", "indiv"), "_", remove = TRUE)
+cad_tfs_degree_hard_thresh_melted$cellType[which(cad_tfs_degree_hard_thresh_melted$cellType == "iPSC-CM")] <- "CM"
 
-cad_plot <- ggplot(cad_tfs_degree_hard_thresh_melted) + geom_point(shape = 19, aes(x = reorder(indiv, -tf_diff_degree), y = tf_diff_degree, col = cellType),) + theme_classic()+ scale_color_manual(values=pallet)+ xlab("Individual") + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())  + labs(title = "CAD TFs",col = "Cell type",shape = "TF")  + facet_grid(. ~ cellType)+ theme(legend.position="none") + ylab(bquote(d^(TF)))
+cad_plot <- ggplot(cad_tfs_degree_hard_thresh_melted) + geom_point(shape = 19, size = 0.5, aes(x = reorder(indiv, -tf_diff_degree), y = tf_diff_degree, col = cellType),) + theme_classic()+ scale_color_manual(values=pallet[c(2,1,3)])+ xlab("Individual") + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())  + labs(title = "CAD TFs",col = "Cell type",shape = "TF")  + facet_grid(. ~ cellType)+ theme(legend.position="none") + ylab(bquote(d^(TF))) +theme(strip.text.x = element_text(size = 10, color = "black", face = "bold"),strip.text.y = element_text(size = 10, color = "black", face = "bold"))
 
 disease_test_tfs_degree_hard_thresh <- data[which(data$GWAS_CD == 1),c(1:358)]
 disease_test_tfs_degree_hard_thresh_melted <- melt(disease_test_tfs_degree_hard_thresh)
 colnames(disease_test_tfs_degree_hard_thresh_melted) <- c("tf","sample","tf_diff_degree")
 disease_test_tfs_degree_hard_thresh_melted <- separate(disease_test_tfs_degree_hard_thresh_melted, sample, c("cellType","tag", "indiv"), "_", remove = TRUE)
+disease_test_tfs_degree_hard_thresh_melted$cellType[which(disease_test_tfs_degree_hard_thresh_melted$cellType == "iPSC-CM")] <- "CM"
 
-cd_plot <- ggplot(disease_test_tfs_degree_hard_thresh_melted) + geom_point(shape = 19, aes(x = reorder(indiv, -tf_diff_degree), y = tf_diff_degree, col = cellType),) + theme_classic()+ scale_color_manual(values=pallet)+ xlab("Individual") + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())  + labs(title = "CD TFs",col = "Cell type",shape = "TF") + facet_grid(. ~ cellType)+ theme(legend.position="none") + ylab(bquote(d^(TF)))
+cd_plot <- ggplot(disease_test_tfs_degree_hard_thresh_melted) + geom_point(shape = 19, size = 0.5, aes(x = reorder(indiv, -tf_diff_degree), y = tf_diff_degree, col = cellType),) + theme_classic()+ scale_color_manual(values=pallet[c(2,1,3)])+ xlab("Individual") + theme( axis.text.x=element_blank(), axis.ticks.x=element_blank())  + labs(title = "CD TFs",col = "Cell type",shape = "TF") + facet_grid(. ~ cellType)+ theme(legend.position="none") + ylab(bquote(d^(TF)))+theme(strip.text.x = element_text(size = 10, color = "black", face = "bold"),strip.text.y = element_text(size = 10, color = "black", face = "bold"))
+
 
 cad_annotated <- annotate_figure(cad_plot,fig.lab = "A", fig.lab.face = "plain", fig.lab.pos = "top.left", fig.lab.size = 14)
 cd_annotated <- annotate_figure(cd_plot,fig.lab = "B", fig.lab.face = "plain", fig.lab.pos = "top.left", fig.lab.size = 14)
 
 combined_plot <- grid.arrange(cad_annotated, cd_annotated, nrow=2, heights = c(3,3))
-combined_plot_annotated <- annotate_figure(combined_plot,top = text_grob("TF disruption scores for disease-related TFs", color = "black", face = "bold", size = 14))
+#combined_plot_annotated <- annotate_figure(combined_plot,top = text_grob("TF disruption scores for disease-related TFs", color = "black", face = "bold", size = 14))
 
-pdf("../figures/disease_tfs_disruptionscore_plot.pdf",width = 6, height = 4)
-plot(combined_plot_annotated)
+pdf("../figures/disease_tfs_disruptionscore_plot.pdf",width = 6, height = 3.5)
+plot(combined_plot)
 dev.off()
 
 ```
 
 ```{r}
 # which individuals have the ipsc cm disruptions for ERG
-indivs_high_erg_disrup <- cad_tfs_degree_hard_thresh_melted[which((cad_tfs_degree_hard_thresh_melted$tf_diff_degree>3) & (cad_tfs_degree_hard_thresh_melted$cellType == "iPSC-CM")),c('indiv','tf_diff_degree')]
+indivs_high_erg_disrup <- cad_tfs_degree_hard_thresh_melted[which((cad_tfs_degree_hard_thresh_melted$tf_diff_degree>3) & (cad_tfs_degree_hard_thresh_melted$cellType == "CM")),c('indiv','tf_diff_degree')]
 indivs_high_erg_disrup
 
 # get tf disruption scores for ERG for all individuals in iPSC-CMs
-tf_disrup_erg_cm <- cad_tfs_degree_hard_thresh_melted[which((cad_tfs_degree_hard_thresh_melted$tf == "ERG") & (cad_tfs_degree_hard_thresh_melted$cellType == "iPSC-CM")),c('indiv','tf_diff_degree')]
+tf_disrup_erg_cm <- cad_tfs_degree_hard_thresh_melted[which((cad_tfs_degree_hard_thresh_melted$tf == "ERG") & (cad_tfs_degree_hard_thresh_melted$cellType == "CM")),c('indiv','tf_diff_degree')]
 ```
 This is the eQTL for ERG
 ERG	ENSG00000159176	201476815	chr1	0.461
@@ -485,8 +489,8 @@ combined_plot <- grid.arrange(cad_alpaca_plot, cd_alpaca_plot, nrow=1, widths = 
 combined_plot_annotated <- annotate_figure(combined_plot,top = text_grob("Distribution of differential modularity scores", color = "black", face = "bold", size = 14))
 
 
-pdf("../figures/alpaca_scores.pdf",width = 6, height = 3)
-plot(combined_plot_annotated)
+pdf("../figures/alpaca_scores.pdf",width = 6, height = 2.7)
+plot(combined_plot)
 dev.off()
 ```
 
@@ -503,7 +507,7 @@ genes_melted <- separate(genes_melted, sample, c("cellType","tag", "indiv"), "_"
 genes_melted$tds <- tf_disrup_erg_cm$tf_diff_degree[match(genes_melted$indiv,tf_disrup_erg_cm$indiv)]
 genes_melted$dosage <- as.numeric(as.vector(c(as.vector(geno[1,c(10:128)]),as.vector(geno[1,c(10:128)]),as.vector(geno[1,c(10:128)]))))
 
-p1 <- ggplot(genes_melted[which(genes_melted$cellType == "iPSCCM"),]) + geom_point(shape = 21,aes(x = reorder(indiv, -alpaca_score), y = (alpaca_score), fill = dosage, size = tds)) + theme_classic()+ scale_fill_gradient(low = "white", high = "#870E75") + theme(axis.text.x=element_blank(), axis.ticks.x=element_blank())+ labs(y = "DM score",fill = "Alt. dosage",size = "ERG TF d'", x= "Individual") 
+p1 <- ggplot(genes_melted[which(genes_melted$cellType == "iPSCCM"),]) + geom_point(shape = 21,aes(x = reorder(indiv, -alpaca_score), y = (alpaca_score), fill = dosage, size = tds)) + theme_classic()+ scale_fill_gradient(low = "white", high = "#870E75") + theme(axis.text.x=element_blank(), axis.ticks.x=element_blank())+ labs(y = "DM score",fill = "A",size = expression(paste("ERG ", d^{(TF)})), x= "Individual") 
 
 p2 <- annotate_figure(p1,top = text_grob("DM scores for CSRP1 (ENSG00000159176)", color = "black", face = "bold", size = 14))
 pdf("../figures/example_gene_alpaca_dosage_and_tfds.pdf",width = 4, height = 3.8)
@@ -572,13 +576,22 @@ go_enrich_plot$Description2 <- Description[match(go_enrich_plot$Description, Des
  #
 go_enrich_plot$celltype <- factor(go_enrich_plot$celltype, levels = c("CM","LCL","iPSC"))
 
-p <- ggplot(go_enrich_plot, aes(x=-log10(Pvalue), y=Description2, colour=celltype, group = celltype, size=b)) + geom_point() + expand_limits(x=0) + labs(x="-log10(P-value)", y="GO term", colour="P value", size="Count") + theme_few() + scale_color_manual(values=pallet[c(2,3,1)]) +  facet_wrap(~celltype)
+p <- ggplot(go_enrich_plot, aes(x=-log10(Pvalue), y=Description2, colour=celltype, group = celltype, size=b)) + geom_point() + expand_limits(x=0) + labs(x="-log10(P-value)", y="GO term", colour="P value", size="Count") + theme_few() + scale_color_manual(values=pallet[c(2,3,1)]) +  facet_grid(~celltype) + guides(color = FALSE)
 y_labs <- ggplot_build(p)$layout$panel_params[[1]]$y$get_labels()
 col_vec <- as.vector(go_enrich_plot$color2)[match(y_labs,go_enrich_plot$Description2)]
 
-p <- p + theme(axis.text.y = element_text(colour = col_vec)) + scale_x_continuous(name="-log10(p-value)",limits=c(1, 8))
-pdf("goplot.pdf",width = 9, height = 8)
-plot(p)
+p <- p + theme(axis.text.y = element_text(colour = col_vec), legend.position = "right") + scale_x_continuous(name="-log10(p-value)",limits=c(1, 8)) +theme(strip.text.x = element_text(size = 16, color = "black", face = "bold"),strip.text.y = element_text(size = 16, color = "black", face = "bold"))
+g <- ggplot_gtable(ggplot_build(p))
+strip_t <- which(grepl('strip-t', g$layout$name))
+fills <- c("#870E75","#0BB19F","#FFBF00")
+k <- 1
+for (i in strip_t) {
+j <- which(grepl('rect', g$grobs[[i]]$grobs[[1]]$childrenOrder))
+g$grobs[[i]]$grobs[[1]]$children[[j]]$gp$fill <- fills[k]
+k <- k+1
+}
+pdf("../figures/goplot.pdf",width = 8.7, height = 8)
+grid.draw(g)
 dev.off()
 ```
 
@@ -598,13 +611,23 @@ go_enrich$Description2 <- Description[match(go_enrich$Description, Description)]
  #
 go_enrich$celltype <- factor(go_enrich$celltype, levels = c("CM","LCL","iPSC"))
 
-p <- ggplot(go_enrich, aes(x=-log10(Pvalue), y=Description2, colour=celltype, group = celltype, size=b)) + geom_point() + expand_limits(x=0) + labs(x="-log10(P-value)", y="GO term", colour="P value", size="Count") + theme_few() + scale_color_manual(values=pallet[c(2,3,1)]) +  facet_wrap(~celltype)
+p <- ggplot(go_enrich, aes(x=-log10(Pvalue), y=Description2, colour=celltype, group = celltype, size=b)) + geom_point() + expand_limits(x=0) + labs(x="-log10(P-value)", y="GO term", colour="P value", size="Count") + theme_few() + scale_color_manual(values=pallet[c(2,3,1)]) +  facet_grid(~celltype) + guides(color = FALSE)
 y_labs <- ggplot_build(p)$layout$panel_params[[1]]$y$get_labels()
 col_vec <- as.vector(go_enrich$color2)[match(y_labs,go_enrich$Description2)]
 
-p <- p + theme(axis.text.y = element_text(colour = col_vec)) + scale_x_continuous(name="-log10(p-value)")
-pdf("goplot_all.pdf",width = 9, height = 16)
-plot(p)
+p <- p + theme(axis.text.y = element_text(colour = col_vec)) + scale_x_continuous(name="-log10(p-value)") +theme(strip.text.x = element_text(size = 12, color = "black", face = "bold"),strip.text.y = element_text(size = 12, color = "black", face = "bold"))
+g <- ggplot_gtable(ggplot_build(p))
+strip_t <- which(grepl('strip-t', g$layout$name))
+fills <- c("#870E75","#0BB19F","#FFBF00")
+k <- 1
+for (i in strip_t) {
+j <- which(grepl('rect', g$grobs[[i]]$grobs[[1]]$childrenOrder))
+g$grobs[[i]]$grobs[[1]]$children[[j]]$gp$fill <- fills[k]
+k <- k+1
+}
+
+pdf("../figures/goplot_all.pdf",width = 10, height = 17)
+grid.draw(g)
 dev.off()
 
 ```
