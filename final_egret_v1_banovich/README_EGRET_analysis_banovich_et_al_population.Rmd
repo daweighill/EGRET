@@ -1,0 +1,86 @@
+---
+title: "EGRET on a population"
+subtitle: "Application of EGRET to 119 individuals in 3 cell types"
+author: "Deborah Weighill"
+output:
+  html_notebook:
+    toc: true
+    theme: cosmo
+    df_print: paged
+---
+
+# Description
+This notebook describes the process taken to run EGRET on the "banovich dataset", which includes 119 genotypes (individuals) and 3 cell types (iPSCs, LCLs and CMs). Downstream analysis of the population of EGRET networks is also performed.
+
+# Getting the Banovich data
+
+## LCL data
+
+### LCL eQTLs:
+wget http://eqtl.uchicago.edu/jointLCL/output_RNAseqGeuvadis_PC14.txt
+
+### LCL RNA-seq:
+wget http://eqtl.uchicago.edu/jointLCL/fastqtl_qqnorm_RNAseqGeuvadis_phase2.txt.gz
+
+## iPSC data
+
+### iPSC eQTLs:
+wget http://eqtl.uchicago.edu/yri_ipsc/iPSC-eQTL-summary.txt
+
+### iPSC RNA-seq:
+From here: https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE107654
+
+wget https://ftp.ncbi.nlm.nih.gov/geo/series/GSE107nnn/GSE107654/suppl/GSE107654_iPSC_processed_counts.txt.gz
+
+## iPSC-CM data
+
+### iPSC-CM eQTLs:
+wget http://eqtl.uchicago.edu/yri_ipsc/eQTL_WASP_CM.txt
+
+### iPSC-CM RNA-seq:
+From here: https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE107654
+
+wget https://ftp.ncbi.nlm.nih.gov/geo/series/GSE107nnn/GSE107654/suppl/GSE107654_iPSC-CM_counts.txt.gz
+
+## Genotype Data
+wget http://eqtl.uchicago.edu/yri_ipsc/genotypesYRI.gen.txt.gz
+
+cut -f1-5 genotypesYRI.gen.txt >genotypes_5col.vcf
+
+# Preprocess Banovich Data
+
+Parse the eQTL data for each cell type, mapping significant eQTLs to motifs within promotors, and construct expression matrices. Do this for LCLs, iPSCs and iPSC-CMs. This is all performed in the '/scripts/preprocess_finalEgret_v1_banovich.Rmd' R notebook.
+
+
+# Run QBiC
+Run QBiC on the eQTL variants per cell type. 
+~/egretFinal_v1/banovich$ bash run_qbic.sh 
+
+Parse the QBiC results to apply a more stringent threshold to non-human PBM-derived models and to include disruptions only.
+
+```{r}
+system("perl /home/ubuntu/EGRET/final_egret_v1_banovich/scripts/parse_qbic_smart1.pl  /home/ubuntu/EGRET/final_egret_v1_banovich/data/genotypes/LCL_eQTL_motif_promotor_finalEgret_v1_banovich_06172020.vcf /home/ubuntu/EGRET/final_egret_v1_banovich/data/genotypes/QbicPred_LCL_banovich_finalEgret_v1_06232020.txt  /home/ubuntu/EGRET/final_egret_v1_banovich/inputs/qbic_banovich_LCL_allModels_smart1.txt")
+
+system("perl /home/ubuntu/EGRET/final_egret_v1_banovich/scripts/parse_qbic_smart1.pl  /home/ubuntu/EGRET/final_egret_v1_banovich/data/genotypes/iPSC_eQTL_motif_promotor_finalEgret_v1_banovich_06172020.vcf /home/ubuntu/EGRET/final_egret_v1_banovich/data/genotypes/QbicPred_iPSC_banovich_finalEgret_v1_06232020.txt  /home/ubuntu/EGRET/final_egret_v1_banovich/inputs/qbic_banovich_iPSC_allModels_smart1.txt")
+
+system("perl /home/ubuntu/EGRET/final_egret_v1_banovich/scripts/parse_qbic_smart1.pl  /home/ubuntu/EGRET/final_egret_v1_banovich/data/genotypes/iPSC-CM_eQTL_motif_promotor_finalEgret_v1_banovich_06172020.vcf /home/ubuntu/EGRET/final_egret_v1_banovich/data/genotypes/QbicPred_iPSC-CM_banovich_finalEgret_v1_06232020.txt  /home/ubuntu/EGRET/final_egret_v1_banovich/inputs/qbic_banovich_iPSC-CM_allModels_smart1.txt")
+```
+
+
+# Run EGRET
+
+We need to run EGRET 119 x 3 times (119 individuals, 3 cell types). First make EGRET commands:
+```{r}
+system("perl /home/ubuntu/EGRET/final_egret_v1_banovich/scripts/make_egret_commands.pl")
+system("perl /home/ubuntu/EGRET/final_egret_v1_banovich/scripts/make_egret_commands_allModels.pl")
+system("perl /home/ubuntu/EGRET/final_egret_v1_banovich/scripts/make_egret_commands_allModels_smart1.pl")
+```
+
+Now we run all the EGRET jobs using gnu-parallel:
+
+parallel --jobs [number of jobs] <egret_commands_all_models_smart1
+
+# Downstream analysis
+
+Analysis of the population of EGRET networks is performed in the R notebook "final_banovich_data_analysis_individual_and_disease_analysis.Rmd". This notebook also produces figures that appear in the paper.
+
