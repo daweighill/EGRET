@@ -2,13 +2,10 @@
 title: "Contribution of different datatypes"
 author: "Deborah Weighill"
 output:
-  html_document:
-    df_print: paged
-    toc: yes
   html_notebook:
-    df_print: paged
+    toc: true
     theme: cosmo
-    toc: yes
+    df_print: paged
 ---
 AUC for ChIP-seq prediction when leaving out data types from EGRET modifiers.
 
@@ -17,7 +14,6 @@ AUC for ChIP-seq prediction when leaving out data types from EGRET modifiers.
 library(reshape2)
 library(rtracklayer)
 library(tidyr)
-library(ggplot2)
 library(pROC)
 library(reshape)
 library(PRROC)
@@ -117,7 +113,7 @@ load("../outputs/validation_table_egret_datatypes_gm12878.RData")
 ```
 
 
-# Validate networks against ChIP-seq
+# Validate entire networks
 
 Plot ROC/PR curves for each PANDA and EGRET nework, as well as table of AUCs and PRs
 ```{r}
@@ -127,19 +123,17 @@ for (i in c(5,10)){
   specs <- colnames(filtered_net_table_gm12878)[i]
   print(specs)
   curve <- evalmod(scores = filtered_net_table_gm12878[,i], labels = as.factor(filtered_net_table_gm12878$chipseq),modnames = c(specs))
+  #curves <- evalmod(curve_data)
   autoplot(curve)
   aucs <- precrec::auc(curve)
   print(aucs)
 }
 ```
 
-Calculate the percentage improvement in the ROC of EGRET with PPI and expression data compared to that of EGRET without PPI and expression data.
 ```{r}
-# percentage improvement= (abs(egret_all_datatypes_ROC - egret_noPPI_noExp_ROC)/egret_noPPI_noExp_ROC))*100 
 perc_improvement <- (abs(0.5749349-0.6031124)/0.5749349)*100
 perc_improvement
 ```
-
 # Validate likely variant-impacted edges
 
 ```{r,results='hide',fig.show=TRUE}
@@ -194,11 +188,16 @@ egret_auc_pvals_gm12878
 ```
 
 
+labels=c("all mods","only QTL mods","only QBiC mods","no PPI/Expr")
+
+pallet <- c("#FFBF00",  "#870E75"  ,  "#0BB19F" )
+Leave one out AUC bar plot
+Do another one with E - |AB|
 ```{r}
 pallet <- c("#FFBF00",  "#870E75"  ,  "#0BB19F" )
 
-p <- ggplot(data = egret_auc_pvals_gm12878, aes(x = reorder(name,-as.numeric(improvement)), y = improvement)) + geom_bar(stat="identity", fill = pallet[3]) + theme_bw()  +  theme(text = element_text(size=12))  +  geom_text(aes(label=signif(improvement,3),vjust = -1) )+  scale_x_discrete("EGRET prior modification",labels=c("E - |qAB|","E - |AB|","E - |B|","E - |qA|")) +  labs(y = "% improvement in AUC-ROC", title = "Contribution of EGRET data types") + ylim(-5,42)
-
+p <- ggplot(data = egret_auc_pvals_gm12878, aes(x = reorder(name,-as.numeric(improvement)), y = improvement)) + geom_bar(stat="identity", fill = pallet[3]) + theme_bw()  +  theme(text = element_text(size=12))  +  geom_text(aes(label=signif(improvement,3)))+  scale_x_discrete("EGRET prior modification",labels=c("E - |qAB|","E - |AB|","E - |B|","E - |qA|")) +  labs(y = "% improvement in AUC-ROC", title = "Contribution of EGRET data types")
+#plot(p)
 pdf("../figures/egret_data_type_contribution.pdf",width = 4, height = 3)
 plot(p)
 dev.off()

@@ -1,10 +1,8 @@
 ---
-title: "Comparison of genetically distict cell lines with EGRET"
+title: "Validation of EGRET - cell line genotype comparison"
 author: "Deborah Weighill"
+date: "October 14, 2020"
 output:
-  html_document:
-    df_print: paged
-    toc: yes
   html_notebook:
     df_print: paged
     theme: cosmo
@@ -12,9 +10,8 @@ output:
 ---
 
 
-# Load libraries
-Load libraries, set up color pallet and set the paths to the ChIP-seq data sets for the two cell lines.
-```{r message=FALSE}
+# Load libraries, preliminaries
+```{r}
 library(xtable)
 library(jcolors)
 library(precrec)
@@ -38,17 +35,12 @@ library(rtracklayer)
 pallet <- c("#FFBF00",  "#870E75"  ,  "#0BB19F" )
 chipseq_gm12878 <- "../chipseq/GM12878_remap2018_all_macs2_hg19_v1_2.bed"
 chipseq_k562 <- "../chipseq/K562_remap2018_all_macs2_hg19_v1_2.bed"
-
-# NOTE: a log file is used to print out statistics called out in the paper.
-logfile <- paste0("../outputs/log_cell_line_comparison.txt")
-write(date(), file = logfile, append = FALSE)
-
 ```
 
 # Create validation table for GM12878
 
+
 ## Load GM12878 networks into table
-Here, we load the EGRET network for GM12878 as well as the baseline PANDA network and melt/combine them it into a data frame with each row representing an edge.
 ```{r echo=FALSE,results='hide'}
 load("../outputs/EGRET_allQBiCModels_gm12878_10142020_panda.RData")
 net <- melt(regnet)
@@ -103,16 +95,6 @@ overlaps_gm12878$gene_name <- gr_genes_promotor$mcols.name2[overlaps_gm12878$sub
 validation_regnet_gm12878 <- separate(overlaps_gm12878, tf_name, c("exp", "tf", "cell line"), "\\.")
 chipseq_regnet_gm12878 <- distinct(validation_regnet_gm12878[,c("tf","gene_name")])
 chipseq_regnet_gm12878$id <- paste0(chipseq_regnet_gm12878$tf,chipseq_regnet_gm12878$gene)
-
-# get number of TFs with ChIP-seq data in GM12878
-experiments <- as.data.frame(gr_chipseq_gm12878$name)
-colnames(experiments)  <- c("experiment")
-experiments <- separate(experiments, experiment, c("exp", "tf", "cell line"), "\\.")
-
-# write to log file
-message <- paste0("Number of TFs with ChIP-seq experiments in GM12878: ",length(unique(experiments$tf)))
-write(c(message), file = logfile, append = TRUE)
-write("\n", file = logfile, append = TRUE)
 ```
 
 ## Overlap egret/panda networks with ChIP-seq data and calcualte differences
@@ -120,7 +102,7 @@ We now filter down the panda/egret networks to only include those TFs which are 
 ```{r echo=FALSE,results='hide'}
 filtered_net_table_gm12878 <- regnet_edge_table_gm12878[(regnet_edge_table_gm12878$tf %in% chipseq_regnet_gm12878$tf) ,]
 filtered_net_table_gm12878$chipseq <- ifelse(filtered_net_table_gm12878$id %in% chipseq_regnet_gm12878$id,1,0)
-# this calculates the edge dusruption scores in GM12878
+
 filtered_net_table_gm12878$diff_egret <- abs(filtered_net_table_gm12878$egret_GM12878 - filtered_net_table_gm12878$panda)
 
 validation_table_gm12878 <- filtered_net_table_gm12878
@@ -133,7 +115,7 @@ load("../outputs/validation_table_gm12878_10142020.RData")
 
 ## Load K562 networks into table
 
-Here, we load the EGRET network for K562 as well as the baseline PANDA network and melt/combine them it into a data frame with each row representing an edge.
+Load all of the PANDA/EGRET regnets
 
 ```{r echo=FALSE,results='hide'}
 # panda - note - the panda network is the same file for K562 and GM12878 as there is no genotype information
@@ -183,17 +165,6 @@ overlaps_k562$gene_name <- gr_genes_promotor$mcols.name2[overlaps_k562$subjectHi
 validation_regnet_k562 <- separate(overlaps_k562, tf_name, c("exp", "tf", "cell line"), "\\.")
 chipseq_regnet_k562 <- distinct(validation_regnet_k562[,c("tf","gene_name")])
 chipseq_regnet_k562$id <- paste0(chipseq_regnet_k562$tf,chipseq_regnet_k562$gene)
-
-# print number of TFs with ChIP-seq data in K562
-experiments <- as.data.frame(gr_chipseq_k562$name)
-colnames(experiments)  <- c("experiment")
-experiments <- separate(experiments, experiment, c("exp", "tf", "cell line"), "\\.")
-length(unique(experiments$tf))
-
-# write to log file
-message <- paste0("Number of TFs with ChIP-seq experiments in K562: ",length(unique(experiments$tf)))
-write(c(message), file = logfile, append = TRUE)
-write("\n", file = logfile, append = TRUE)
 ```
 
 ## Overlap egret/panda networks with ChIP-seq data and calcualte differences
@@ -201,7 +172,6 @@ We now filter down the panda/egret networks to only include those TFs which are 
 ```{r echo=FALSE,results='hide'}
 filtered_net_table_k562 <- regnet_edge_table_k562[(regnet_edge_table_k562$tf %in% chipseq_regnet_k562$tf) ,]
 filtered_net_table_k562$chipseq <- ifelse(filtered_net_table_k562$id %in% chipseq_regnet_k562$id,1,0)
-# this calculates the edge dusruption scores in K562
 filtered_net_table_k562$diff_egret <- abs(filtered_net_table_k562$egret_k562 - filtered_net_table_k562$panda)
 
 validation_table_k562 <- filtered_net_table_k562
@@ -243,20 +213,7 @@ dev.off()
 Here we select some examples for visualization in IGV, to show examples where the GM12878 and K562 EGRET networks have differential ChIP-seq binding and K562 has a high edge disruption score.
 ```{r}
 load("../outputs/combined_validation_table_10142020.RData")
-examples <- combined_table[which((combined_table$chipseq_k562 != combined_table$chipseq_gm12878) & (combined_table$diff_k562 > 0.5)),c(1:11)]
-examples
-
-# write to log file
-message <- paste0("Example 1: TF disruptions in K562 and not GM12878: ")
-write(c(message), file = logfile, append = TRUE)
-write.table(examples[which(examples$id == "RELAENSG00000165449"),], file = logfile, append = TRUE, quote = FALSE, col.names = TRUE, row.names = FALSE, sep = "\t")
-write("\n", file = logfile, append = TRUE)
-
-# write to log file
-message <- paste0("Example 2: TF disruptions in K562 and not GM12878: ")
-write(c(message), file = logfile, append = TRUE)  
-write.table(examples[which(examples$id == "ARID3AENSG00000187953"),], file = logfile, append = TRUE, quote = FALSE, col.names = TRUE, row.names = FALSE, sep = "\t")
-write("\n", file = logfile, append = TRUE)
+combined_table[which((combined_table$chipseq_k562 != combined_table$chipseq_gm12878) & (combined_table$diff_k562 > 0.5)),c(1:11)]
 ```
 
 # Cell line regulatory difference validation
@@ -268,50 +225,50 @@ Are differences in cell lines based on EGRET edge weights enriched for differenc
 # load the combined data of GM12878 and K562, which overlaps with chipseq data for both.
 load("../outputs/combined_validation_table_10142020.RData")
 
-# This calulates a regulatory difference score between the two genotypes as the difference between the edge disruption scores
+# calculate a difference score between the two genotypes
 combined_table$diff_celline_egret <- abs(combined_table$diff_gm12878-combined_table$diff_k562)
-# calculate difference in ChIP-seq binding networks
+# calculate difference in ChIP-seq binding
 combined_table$diff_chip_k_g <- abs(combined_table$chipseq_k562-combined_table$chipseq_gm12878)
 
 ```
 
 Test if top difference edges between genotypes are enriched in diff chipseq, using a t test and a fisher test
 ```{r}
-# construct the contingency table - test if top 10% of scores are enriched for differential TF binding
+data <- combined_table
+mylist <- as.vector(data[order(-as.numeric(as.vector(data$diff_celline_egret))),1])
+subset <- as.vector(data[which(data$diff_chip_k_g == 1),1])
+test <- TestNodeRank(mylist, subset)
+test
+
+length(mylist)
+length(subset)
+
+# manual contingency table
 colnames(combined_table)[8] <- "panda2"
 top10 <- top_frac(combined_table,0.1,diff_celline_egret)
 high_d_chip <- length(which((combined_table$id %in% top10$id) & (combined_table$diff_chip_k_g == 1)))
 low_d_chip <- length(which((!(combined_table$id %in% top10$id)) & (combined_table$diff_chip_k_g == 1)))
 high_d_not_chip <- length(which((combined_table$id %in% top10$id) & (combined_table$diff_chip_k_g == 0)))
 low_d_not_chip <- length(which((!(combined_table$id %in% top10$id)) & (combined_table$diff_chip_k_g == 0)))
+
 contingency_table <- matrix(c(high_d_chip,low_d_chip,high_d_not_chip,low_d_not_chip), nrow = 2,dimnames = list(Diff = c("High", "Low"),DiffChip = c("yes", "no")))
-  
-#Perform a right-tailed fisher exact test
-fishertest <- fisher.test(contingency_table, alternative = "greater")
-fishertest$p.value
+  test <- fisher.test(contingency_table, alternative = "greater")
 
-# Perform a t-test
-t.test(combined_table[which(combined_table$diff_chip_k_g == 1),]$diff_celline_egret,combined_table[which(combined_table$diff_chip_k_g == 0),]$diff_celline_egret, alternative="greater")
+t.test(data[which(data$diff_chip_k_g == 1),]$diff_celline_egret,data[which(data$diff_chip_k_g == 0),]$diff_celline_egret, alternative="greater")
 
-mean(combined_table[which(combined_table$diff_chip_k_g == 1),]$diff_celline_egret)
-mean(combined_table[which(combined_table$diff_chip_k_g == 0),]$diff_celline_egret)
-
-# write to log file
-message <- paste0("Fisher exact test p-value: enrichment of differential TF binding in high regulatory difference edges:")
-write(c(message), file = logfile, append = TRUE)  
-write(fishertest$p.value, file = logfile, append = TRUE)
-write("\n", file = logfile, append = TRUE)
+mean(data[which(data$diff_chip_k_g == 1),]$diff_celline_egret)
+mean(data[which(data$diff_chip_k_g == 0),]$diff_celline_egret)
 ```
 
 
-## Approach 2: Allele-specific expression (ASE)  - differential gene regulation comparison
+## Approach 2: Allele-specific expression (differential gene regulation comparison)
 
-Are genes with high disruption scores enriched for ASE?
+Are high difference edges enriched for ASE
 ```{r}
+#load complete edge talbes - dont need to overlap with chipseq here
 load("../outputs/edge_table_gm12878_10142020.RData")
 load("../outputs/edge_table_k562_10142020.RData")
 
-# combine the GM12878 and K562 network tables
 colnames(regnet_edge_table_gm12878) <- c("id","tf","gene","panda","egret_gm12878")
 colnames(regnet_edge_table_k562) <- c("id","tf","gene","panda","egret_k562")
 regnet_edge_table_gm12878$diff_g <- abs(regnet_edge_table_gm12878$panda-regnet_edge_table_gm12878$egret_gm12878)
@@ -320,29 +277,39 @@ combined_table_all <- join(regnet_edge_table_gm12878,regnet_edge_table_k562,by =
 save(combined_table_all, file = "../outputs/combined_edge_table.RData")
 
 load("../outputs/combined_edge_table.RData")
-
-# This calulates a regulatory difference score between the two genotypes as the difference between the edge disruption scores
 combined_table_all$diff_celline_egret <- abs(combined_table_all$diff_k-combined_table_all$diff_g)
 
-# load data for ASE variants within motifs in promoter regions
 ase_promotor <- read.table("../ase/ase_mapped_motifs_09012020.txt", header = FALSE)
 colnames(ase_promotor) <- c("tf","gene","pval","fdr","chr","pos")
 ase_promotor$snpID <- paste0(ase_promotor$chr,"_",ase_promotor$pos)
 ase_promotor$id <- paste0(ase_promotor$tf,ase_promotor$gene)
-# mark significant ASE variants (FDR < 0.1)
 ase_promotor_signif <- ase_promotor[which(ase_promotor$fdr <= 0.1),]
 
-# select the subset our network which maps to ASE variants which were tested by the ASE experiment, so as to have the appropriate background.
 combined_table_all_ase_tested <- combined_table_all[which(combined_table_all$id %in% ase_promotor$id),]
 combined_table_all_ase_tested$ase_signif <- ifelse(combined_table_all_ase_tested$id %in% ase_promotor_signif$id, 1, 0)
 
-# Calculate the regulatory difference scores for genes
+# aggregate by gene
 gene_ag <- aggregate(combined_table_all_ase_tested$diff_celline_egret, by = list(combined_table_all_ase_tested$gene), FUN = sum)
 colnames(gene_ag) <- c("gene","sum_diff_k_g")
+
 gene_ag$ase_signif <- ifelse(gene_ag$gene %in% ase_promotor_signif$gene, 1, 0)
 
 
-# construct contingency table - test if top 10% of scores are enriched for ASE
+# test enrichment
+data <- gene_ag
+mylist <- as.vector(data[order(-as.numeric(as.vector(data$sum_diff_k_g))),1])
+subset <- data[which(data$ase_signif == 1),1]
+test <- TestNodeRank(mylist, subset)
+test
+
+length(mylist)
+length(subset)
+
+t.test(data[which(data$ase_signif == 1),]$sum_diff_k_g,data[which(data$ase_signif == 0),]$sum_diff_k_g, alternative="greater")
+
+mean(data[which(data$ase_signif == 1),]$sum_diff_k_g)
+mean(data[which(data$ase_signif == 0),]$sum_diff_k_g)
+
 top10 <- top_frac(gene_ag,0.1,sum_diff_k_g)
 high_d_ase <- length(which((gene_ag$gene %in% top10$gene) & (gene_ag$ase_signif == 1)))
 low_d_ase <- length(which((!(gene_ag$gene %in% top10$gene)) & (gene_ag$ase_signif == 1)))
@@ -350,21 +317,13 @@ high_d_not_ase <- length(which((gene_ag$gene %in% top10$gene) & (gene_ag$ase_sig
 low_d_not_ase <- length(which((!(gene_ag$gene %in% top10$gene)) & (gene_ag$ase_signif == 0)))
 
 contingency_table <- matrix(c(high_d_ase,low_d_ase,high_d_not_ase,low_d_not_ase), nrow = 2,dimnames = list(Diff = c("High", "Low"),ASE = c("yes", "no")))
-fishertest <- fisher.test(contingency_table, alternative = "greater")
-fishertest$p.value
+  test <- fisher.test(contingency_table, alternative = "greater")
 
-# write to log file
-message <- paste0("Fisher exact test p-value: enrichment of ASE in high regulatory difference genes:")
-write(c(message), file = logfile, append = TRUE)  
-write(fishertest$p.value, file = logfile, append = TRUE)
-write("\n", file = logfile, append = TRUE)
 
 ```
 
 
-# Approach 3: caQTLs  - differential gene regulation comparison 
-Are genes with high disruption scores enriched for caQTLs?
-
+# Approach 3: caQTLs (differential gene regulation comparison)
 ```{r}
 # load caQTLs in motifs in promotors
 caqtl <- read.table("../caqtl/caqtl_mapped_motifs_09092020.txt", header = FALSE)
@@ -373,34 +332,63 @@ caqtl$snpID <- paste0(caqtl$chrom,"_",caqtl$pos)
 caqtl$edge_id <- paste0(caqtl$tf,caqtl$gene)
 caqtl$fdr <- qvalue(caqtl$pval)$qvalues
 caqtl_signif_fdr <- caqtl[which(caqtl$fdr < 0.1),]
-
-# select the subset our network which maps to caQTL variants which were tested by the caQTL experiment, so as to have the appropriate background.
+# subset combined g/k edges to those which are tested for caQTLs
 combined_table_all_caqtl_tested <- combined_table_all[which(combined_table_all$id %in% caqtl$edge_id),]
+
 # mark edges as significant caQTL or not
 combined_table_all_caqtl_tested$caqtl_signif <- ifelse(combined_table_all_caqtl_tested$id %in% caqtl_signif_fdr$edge_id, 1, 0)
 
-# Calculate the regulatory difference scores for genes
+
+#aggregate by gene
 gene_ag <- aggregate(combined_table_all_caqtl_tested$diff_celline_egret, by = list(combined_table_all_caqtl_tested$gene), FUN = sum)
 colnames(gene_ag) <- c("gene","sum_diff_k_g")
 gene_ag$cqtl <- ifelse(gene_ag$gene %in% caqtl_signif_fdr$gene, 1, 0)
 
-# construct contingency table - test if top 10% of scores are enriched for ASE
-top10 <- top_frac(gene_ag,0.1,sum_diff_k_g)
-high_d_caqtl <- length(which((gene_ag$gene %in% top10$gene) & (gene_ag$cqtl == 1)))
-low_d_caqtl <- length(which((!(gene_ag$gene %in% top10$gene)) & (gene_ag$cqtl == 1)))
-high_d_not_caqtl <- length(which((gene_ag$gene %in% top10$gene) & (gene_ag$cqtl == 0)))
-low_d_not_caqtl <- length(which((!(gene_ag$gene %in% top10$gene)) & (gene_ag$cqtl == 0)))
+mylist <- as.vector(gene_ag[order(-as.numeric(as.vector(gene_ag$sum_diff_k_g))),1])
+subset <- gene_ag[which(gene_ag$cqtl == 1),1]
+test <- TestNodeRank(mylist, subset)
+test
 
-contingency_table <- matrix(c(high_d_caqtl,low_d_caqtl,high_d_not_caqtl,low_d_not_caqtl), nrow = 2,dimnames = list(Diff = c("High", "Low"),caQTL = c("yes", "no")))
-fishertest <- fisher.test(contingency_table, alternative = "greater")
-fishertest$p.value
+length(mylist)
+length(subset)
 
-# write to log file
-message <- paste0("Fisher exact test p-value: enrichment of caQTLs in high regulatory difference genes:")
-write(c(message), file = logfile, append = TRUE)  
-write(fishertest$p.value, file = logfile, append = TRUE)
-write("\n", file = logfile, append = TRUE)
+t.test(gene_ag[which(gene_ag$cqtl == 1),]$sum_diff_k_g,gene_ag[which(gene_ag$cqtl == 0),]$sum_diff_k_g, alternative="greater")
 
+
+```
+
+
+
+
+
+# Make table of snps which contribute and are also caQTLs
+```{r}
+# load GM12878 SNPs
+snps_g <- read.table("../outputs/edge_modifications_SNPsEGRET_allQBiCModels_gm12878_10142020.txt")
+colnames(snps_g) <- c("tf"  ,  "gene"  ,  "snpPos" ,  "chr" ,   "effect",  "snpID", "alt_allele_count", "edgeE","qtlTF" , "qbicEffectSize", "qbicEffect" ,"absQbicEffectSize", "absQtlQffect_altAlleleCount_qbicEffect")
+snps_g$edge_id <- paste0(snps_g$tf,snps_g$gene)
+
+# load K562 SNPs
+snps_k <- read.table("../outputs/edge_modifications_SNPsEGRET_allQBiCModels_k562_10142020.txt")
+colnames(snps_k) <- c("tf"  ,  "gene"  ,  "snpPos" ,  "chr" ,   "effect",  "snpID", "alt_allele_count", "edgeE","qtlTF" , "qbicEffectSize", "qbicEffect" ,"absQbicEffectSize", "absQtlQffect_altAlleleCount_qbicEffect")
+snps_k$edge_id <- paste0(snps_k$tf,snps_k$gene)
+
+caqtl <- read.table("../caqtl/cht_results_full_LCL.txt", header = TRUE)
+caqtl$snp_id <- paste0(caqtl$TEST.SNP.CHROM,"_",caqtl$TEST.SNP.POS)
+caqtl_signif <- caqtl[which(caqtl$P.VALUE < 1e-5),]
+
+caqtl_k <- snps_k[which(snps_k$snpID %in% caqtl_signif$snp_id),]
+caqtl_k$diffscore <- combined_table_all$diff_egret_egret_k_g[match(caqtl_k$edge_id,combined_table_all$id)]
+caqtl_g <- snps_g[which(snps_g$snpID %in% caqtl_signif$snp_id),]
+caqtl_g$diffscore <- combined_table_all$diff_egret_egret_k_g[match(caqtl_g$edge_id,combined_table_all$id)]
+
+
+caqtl_k
+caqtl_g
+
+# annotate edges in table
+combined_table_all$caqtl_k <- ifelse(combined_table_all$id %in% caqtl_k$edge_id,1,0)
+combined_table_all$caqtl_g <- ifelse(combined_table_all$id %in% caqtl_g$edge_id,1,0)
 ```
 
 # Performance (AUC-ROCs) of ChIP-seq prediction
@@ -518,33 +506,12 @@ print(xtable(egret_auc_pvals_table, type = "latex"), file = "../tables/pval_tabl
 
 
 # Analysis of edited prior edges
-
-First print the total number of prior edges in the naive prior:
-
-```{r}
-edge_count <- system("wc -l /home/ubuntu/EGRET/final_egret_v1/outputs/priors_EGRET_allQBiCModels_gm12878_10142020.txt",intern = TRUE)
-
-# write to log file
-message <- paste0("Total number of edges in naive motif prior:")
-write(c(message), file = logfile, append = TRUE)  
-write(edge_count, file = logfile, append = TRUE)
-write("\n", file = logfile, append = TRUE)
-```
-
 Plot the distributions of prior modifications - the modifications made to motif prior edges which were penalized because of variant disruptions.
 
 ```{r}
 # load gm12878 edited prior edges
 edited_gm12878 <- read.table("../outputs/edge_modifications_EGRET_allQBiCModels_gm12878_10142020.txt", header = FALSE)
-# dimension shows number of edited prior edges - each row is an edited edge
 dim(edited_gm12878)
-
-# write to log file
-message <- paste0("Total number of edited prior edges in GM12878:")
-write(c(message), file = logfile, append = TRUE)  
-write(dim(edited_gm12878)[1], file = logfile, append = TRUE)
-write("\n", file = logfile, append = TRUE)
-
 colnames(edited_gm12878) <- c("tf","gene","id","mod")
 
 p1 <- ggplot(edited_gm12878, aes(x=mod)) + geom_density(fill=pallet[3], col = pallet[3]) + theme_bw() + scale_color_manual(values=pallet) + scale_fill_manual(values=pallet) +labs(title="GM12878", x ="Prior modification qAB", y = "Density")
@@ -562,15 +529,7 @@ dim(edited_gm12878_chip[edited_gm12878_chip$chipseq == 0,])
 ```{r}
 # load k562 edited prior edges
 edited_k562 <- read.table("../outputs/edge_modifications_EGRET_allQBiCModels_k562_10142020.txt", header = FALSE)
-# dimension shows number of edited prior edges - each row is an edited edge
 dim(edited_k562)
-
-# write to log file
-message <- paste0("Total number of edited prior edges in K562:")
-write(c(message), file = logfile, append = TRUE)  
-write(dim(edited_k562)[1], file = logfile, append = TRUE)
-write("\n", file = logfile, append = TRUE)
-
 colnames(edited_k562) <- c("tf","gene","id","mod")
 
 p2 <- ggplot(edited_k562, aes(x=mod)) + geom_density(fill=pallet[2], col = pallet[2]) + theme_bw() + scale_color_manual(values=pallet) + scale_fill_manual(values=pallet) +labs(title="K562", x ="Prior modification qAB", y = "Density")

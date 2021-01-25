@@ -1,5 +1,5 @@
 ---
-title: "Run finalEgret v1 - GM12878"
+title: "Run EGRET with no Expression and PPI message passing - GM12878"
 author: "Deborah Weighill"
 output:
   html_notebook:
@@ -11,7 +11,7 @@ ___
 # Description
 ___
 
-Run EGRET on GM12878 (using all QBiC models).
+Running EGRET (*without Expr data and PPI data*) on GM12878.
 
 # Libraries and tags
 ```{r libraries_and_tags}
@@ -26,17 +26,13 @@ library(dplyr)
 library(pandaR)
 
 # this tag should indicate the genotype and the date
-tag <- "EGRET_allQBiCModels_gm12878_10142020"
-
-# make a name for log file
-logfile <- paste0("../outputs/log_",tag,".txt")
+tag <- "finalEGRET_v1_noExpr_noPPI_gm12878"
 ```
 
 # Inputs
 
 Individual inputs:
 ```{r individual_inputs}
-
 qbic <- read.table(file = "../inputs/qbic_eQTLS_GM12878_K562_finalEGRET_v1_06302020_allModels_smart1.txt", header = FALSE)
 
   
@@ -142,9 +138,6 @@ QTL_tf_gene_pairs[is.na(QTL_tf_gene_pairs)] <- 0
 # now we make our "per SNP" combinations (i.e. products of eQTL and qbic variables)
 QTL_tf_gene_pairs$absQtlQffect_altAlleleCount_qbicEffect <- abs(QTL_tf_gene_pairs$effect) * QTL_tf_gene_pairs$alt_allele_count * QTL_tf_gene_pairs$qbicEffect
 
-# writecontributing SNPs to file
-snp_edges_file <- paste0("../outputs/edge_modifications_SNPs",tag,".txt")
-write.table(QTL_tf_gene_pairs[which(QTL_tf_gene_pairs$absQtlQffect_altAlleleCount_qbicEffect != 0),], file = snp_edges_file, sep = "\t", quote=FALSE, row.names = FALSE, col.names = FALSE)
 ```
 
 Now we have a matrix of QTLs (and their associated TF-gene edge) as well as their qbic effect (which can be zero if the qbic effect of the SNP was not significant for that TF) and the combinations of QTL and qbic data.
@@ -165,15 +158,6 @@ absQtlQffect_altAlleleCount_qbicEffect <- aggregate(absQtlQffect_altAlleleCount_
 
 # put into mods matrix
 mods$absQtlQffect_altAlleleCount_qbicEffect <- absQtlQffect_altAlleleCount_qbicEffect$absQtlQffect_altAlleleCount_qbicEffect[match(mods$edgeID, absQtlQffect_altAlleleCount_qbicEffect$edgeID)]
-
-# number of edited edges
-edits <- dim(mods[which(mods$absQtlQffect_altAlleleCount_qbicEffect != 0),])[1]
-message <- paste0("Number of edited edges: ",edits)
-write(c(message), file = logfile, append = TRUE)
-
-# write edited prior edges to file
-mod_edges_file <- paste0("../outputs/edge_modifications_",tag,".txt")
-write.table(mods[which(mods$absQtlQffect_altAlleleCount_qbicEffect != 0),], file = mod_edges_file, sep = "\t", quote=FALSE, row.names = FALSE, col.names = FALSE)
 ```
 
 
@@ -207,14 +191,16 @@ write.table(combined, file = priorfile, col.names = TRUE, row.names = FALSE, sep
 # Run PANDA Message Passing 
 
 ```{r run_message_passing}
-processes <- c(1,2)
-prior_list <- list(egretPrior,panda_prior)
-prior_names <- c("egret","panda")
+processes <- c(1)
+#processes <- c(1,2)
+prior_list <- list(panda_prior)
+#prior_list <- list(panda_prior, egretPrior)
+prior_names <- c("panda","egret")
 
 mclapply(processes, function(p) {
-  system.time(results <- panda(as.data.frame(prior_list[p]), expr=clean_data, ppi=ppiFiltered,progress=TRUE, remove.missing.ppi = TRUE, remove.missing.motif = TRUE, remove.missing.genes = TRUE))
+  system.time(results <- panda(as.data.frame(prior_list[p]), expr=clean_data[,c(1,2)], ppi=NULL,progress=TRUE, remove.missing.ppi = TRUE, remove.missing.motif = TRUE, remove.missing.genes = TRUE))
   filename <- paste0("../outputs/",tag,"_",prior_names[p],".RData")
   regnet <- results@regNet
   save(regnet, file = filename)
-}, mc.cores = 2,mc.preschedule=TRUE)
+d}, mc.cores = 1,mc.preschedule=TRUE)
 ```

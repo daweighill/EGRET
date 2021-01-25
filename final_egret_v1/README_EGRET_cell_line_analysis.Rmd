@@ -54,14 +54,15 @@ system("perl /home/ubuntu/EGRET/final_egret_v1/scripts/parse_qbic_smart1_separat
 
 ```
 
-
-
-# Run EGRET GM12878 and K562 
+# Run EGRET
 We then ran EGRET using the following R notebooks on the commandline as follows:
 
+
+## Run EGRET GM12878 and K562
 Rscript -e "rmarkdown::render('final_runEgret_na12878_allQBiCModels.Rmd')"
 Rscript -e "rmarkdown::render('final_runEgret_k562_allQBiCModels.Rmd')"
 
+## Run EGRET using different combinations of data types to edit the motif prior 
 Rscript -e "rmarkdown::render('runEgret_noQbic_gm12878.Rmd')"
 Rscript -e "rmarkdown::render('runEgret_onlyQbic_gm12878.Rmd')"
 Rscript -e "rmarkdown::render('runEgret_onlyQTLs_gm12878.Rmd')"
@@ -69,6 +70,10 @@ Rscript -e "rmarkdown::render('runEgret_noExpr_noPPI_gm12878.Rmd')"
 
 
 # Validation, analysis and visualization  
-Comparison and validation of the EGRET networks for these two cell line genotypes was performed using the "cell_line_genotype_validation_09162020.Rmd" R notebook. This also produces the figures from the paper. The make_beds.pl script makes bed files for the eQTLs and locations for visualization in IGV.
+Comparison and validation of the EGRET networks for these two cell line genotypes was performed using the "/scripts/cell_line_genotype_validation_09162020.Rmd" R notebook. This also produces the figures from the paper.
+
+Investigation of the constribution of different data types to EGRET was performed using the "/scripts/egret_datatype_contribution.Rmd" R notebook.
+
+The "/scripts/make_beds.pl" script makes bed files for the eQTLs and locations for visualization in IGV. 
 
 

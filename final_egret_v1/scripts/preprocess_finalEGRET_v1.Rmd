@@ -1,7 +1,6 @@
 ---
 title: "finalEGRET v1 preprocessing"
 author: "Deborah Weighill"
-date: "June 17, 2020"
 output:
   html_notebook:
     toc: true
