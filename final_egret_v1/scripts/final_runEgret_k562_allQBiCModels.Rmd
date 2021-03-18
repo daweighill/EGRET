@@ -1,7 +1,6 @@
 ---
 title: "Run final Egret v1 - K562"
 author: "Deborah Weighill"
-date: "August 17, 2020"
 output:
   html_notebook:
     toc: true

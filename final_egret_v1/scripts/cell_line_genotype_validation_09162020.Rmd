@@ -267,59 +267,30 @@ Are differences in cell lines based on EGRET edge weights enriched for differenc
 ```{r}
 # load the combined data of GM12878 and K562, which overlaps with chipseq data for both.
 load("../outputs/combined_validation_table_10142020.RData")
-
-# This calulates a regulatory difference score between the two genotypes as the difference between the edge disruption scores. 
-combined_table$diff_celline_egret_g_k <- combined_table$diff_gm12878-combined_table$diff_k562
+# This calulates a regulatory difference score between the two genotypes as the difference between the edge disruption scores
+combined_table$diff_celline_egret <- abs(combined_table$diff_gm12878-combined_table$diff_k562)
 # calculate difference in ChIP-seq binding networks
-combined_table$diff_chip_k_g <- combined_table$chipseq_k562-combined_table$chipseq_gm12878
-
+combined_table$diff_chip_k_g <- abs(combined_table$chipseq_k562-combined_table$chipseq_gm12878)
 ```
 
 Test if top difference edges between genotypes are enriched in diff chipseq, using a t test and a fisher test
 ```{r}
 # construct the contingency table - test if top 10% of scores are enriched for differential TF binding
 colnames(combined_table)[8] <- "panda2"
-top10 <- top_frac(combined_table,0.1,diff_celline_egret_g_k)
+top10 <- top_frac(combined_table,0.1,diff_celline_egret)
 high_d_chip <- length(which((combined_table$id %in% top10$id) & (combined_table$diff_chip_k_g == 1)))
 low_d_chip <- length(which((!(combined_table$id %in% top10$id)) & (combined_table$diff_chip_k_g == 1)))
-high_d_not_chip <- length(which((combined_table$id %in% top10$id) & (combined_table$diff_chip_k_g != 1)))
-low_d_not_chip <- length(which((!(combined_table$id %in% top10$id)) & (combined_table$diff_chip_k_g != 1)))
+high_d_not_chip <- length(which((combined_table$id %in% top10$id) & (combined_table$diff_chip_k_g == 0)))
+low_d_not_chip <- length(which((!(combined_table$id %in% top10$id)) & (combined_table$diff_chip_k_g == 0)))
 contingency_table <- matrix(c(high_d_chip,low_d_chip,high_d_not_chip,low_d_not_chip), nrow = 2,dimnames = list(Diff = c("High", "Low"),DiffChip = c("yes", "no")))
   
 #Perform a right-tailed fisher exact test
 fishertest <- fisher.test(contingency_table, alternative = "greater")
 fishertest$p.value
-
-# write to log file
-message <- paste0("Fisher exact test p-value: enrichment of differential TF binding in high regulatory difference edges:")
-write(c(message), file = logfile, append = TRUE)  
-write(fishertest$p.value, file = logfile, append = TRUE)
-write("\n", file = logfile, append = TRUE)
-```
-```{r}
-# This calulates a regulatory difference score between the two genotypes as the difference between the edge disruption scores. 
-combined_table$diff_celline_egret_k_g <- combined_table$diff_k562-combined_table$diff_gm12878
-# calculate difference in ChIP-seq binding networks
-combined_table$diff_chip_g_k <- combined_table$chipseq_gm12878-combined_table$chipseq_k562
-
-```
-
-Test if top difference edges between genotypes are enriched in diff chipseq, using a t test and a fisher test
-```{r}
-# construct the contingency table - test if top 10% of scores are enriched for differential TF binding
-colnames(combined_table)[8] <- "panda2"
-top10 <- top_frac(combined_table,0.1,diff_celline_egret_k_g)
-high_d_chip <- length(which((combined_table$id %in% top10$id) & (combined_table$diff_chip_g_k == 1)))
-low_d_chip <- length(which((!(combined_table$id %in% top10$id)) & (combined_table$diff_chip_g_k == 1)))
-high_d_not_chip <- length(which((combined_table$id %in% top10$id) & (combined_table$diff_chip_g_k != 1)))
-low_d_not_chip <- length(which((!(combined_table$id %in% top10$id)) & (combined_table$diff_chip_g_k != 1)))
-contingency_table <- matrix(c(high_d_chip,low_d_chip,high_d_not_chip,low_d_not_chip), nrow = 2,dimnames = list(Diff = c("High", "Low"),DiffChip = c("yes", "no")))
-  
-#Perform a right-tailed fisher exact test
-fishertest <- fisher.test(contingency_table, alternative = "greater")
-fishertest$p.value
-
-
+# Perform a t-test
+t.test(combined_table[which(combined_table$diff_chip_k_g == 1),]$diff_celline_egret,combined_table[which(combined_table$diff_chip_k_g == 0),]$diff_celline_egret, alternative="greater")
+mean(combined_table[which(combined_table$diff_chip_k_g == 1),]$diff_celline_egret)
+mean(combined_table[which(combined_table$diff_chip_k_g == 0),]$diff_celline_egret)
 # write to log file
 message <- paste0("Fisher exact test p-value: enrichment of differential TF binding in high regulatory difference edges:")
 write(c(message), file = logfile, append = TRUE)  

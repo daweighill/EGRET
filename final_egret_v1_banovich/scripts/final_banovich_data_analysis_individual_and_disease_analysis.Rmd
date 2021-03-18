@@ -46,8 +46,6 @@ Load all of the PANDA/EGRET regnets and merge into a single table.
 
 ## Load the LCL results
 ```{r echo=FALSE,results='hide',message=FALSE}
-library(reshape2)
-# panda"
 load("../outputs/finalEgret_v1_banovich_LCL_allModels_smart1_07032020_1_panda.RData")
 net <- melt(regnet)
 colnames(net) = c("tf","gene","score")
