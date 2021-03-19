@@ -1,0 +1,46 @@
+R version 3.6.1 (2019-07-05)
+Platform: x86_64-pc-linux-gnu (64-bit)
+Running under: Ubuntu 18.04.2 LTS
+
+Matrix products: default
+BLAS:   /usr/lib/x86_64-linux-gnu/openblas/libblas.so.3
+LAPACK: /usr/lib/x86_64-linux-gnu/libopenblasp-r0.2.20.so
+
+locale:
+ [1] LC_CTYPE=C.UTF-8       LC_NUMERIC=C           LC_TIME=C.UTF-8        LC_COLLATE=C.UTF-8    
+ [5] LC_MONETARY=C.UTF-8    LC_MESSAGES=C.UTF-8    LC_PAPER=C.UTF-8       LC_NAME=C             
+ [9] LC_ADDRESS=C           LC_TELEPHONE=C         LC_MEASUREMENT=C.UTF-8 LC_IDENTIFICATION=C   
+
+attached base packages:
+[1] grid      stats     graphics  grDevices utils     datasets  methods   base     
+
+other attached packages:
+ [1] forcats_0.5.0         ggthemes_4.2.0        gridExtra_2.3         ALPACA_0.0.0.9000    
+ [5] jcolors_0.0.4         reshape2_1.4.3        ggpubr_0.3.0          tidyr_1.0.2          
+ [9] ggplot2_3.3.2         preprocessCore_1.46.0 xtable_1.8-4          dplyr_0.8.5          
+
+loaded via a namespace (and not attached):
+ [1] nlme_3.1-141           Category_2.50.0        bitops_1.0-6           bit64_0.9-7           
+ [5] Rgraphviz_2.28.0       tools_3.6.1            backports_1.1.4        R6_2.4.0              
+ [9] KernSmooth_2.23-15     DBI_1.0.0              BiocGenerics_0.30.0    colorspace_1.4-1      
+[13] nnet_7.3-12            withr_2.1.2            tidyselect_1.0.0       bit_1.1-14            
+[17] curl_4.3               compiler_3.6.1         graph_1.62.0           Biobase_2.44.0        
+[21] caTools_1.18.0         scales_1.0.0           genefilter_1.66.0      condor_1.1.1          
+[25] RBGL_1.60.0            stringr_1.4.0          digest_0.6.20          foreign_0.8-72        
+[29] rmarkdown_2.1          rio_0.5.16             AnnotationForge_1.26.0 base64enc_0.1-3       
+[33] pkgconfig_2.0.2        htmltools_0.4.0        rlang_0.4.5            readxl_1.3.1          
+[37] rstudioapi_0.10        RSQLite_2.1.2          GOstats_2.50.0         generics_0.0.2        
+[41] jsonlite_1.6           gtools_3.8.2           zip_2.0.4              car_3.0-8             
+[45] RCurl_1.98-1.1         magrittr_1.5           GO.db_3.8.2            Matrix_1.2-17         
+[49] Rcpp_1.0.2             munsell_0.5.0          S4Vectors_0.22.0       abind_1.4-5           
+[53] lifecycle_0.2.0        stringi_1.4.3          yaml_2.2.0             carData_3.0-4         
+[57] org.Hs.eg.db_3.8.2     gplots_3.0.4           plyr_1.8.4             blob_1.2.0            
+[61] gdata_2.18.0           parallel_3.6.1         crayon_1.3.4           lattice_0.20-38       
+[65] haven_2.3.1            splines_3.6.1          annotate_1.62.0        hms_0.5.3             
+[69] knitr_1.23             pillar_1.4.4           igraph_1.2.4.1         ggsignif_0.6.0        
+[73] stats4_3.6.1           XML_3.99-0.3           glue_1.3.1             evaluate_0.14         
+[77] data.table_1.12.2      vctrs_0.3.1            cellranger_1.1.0       gtable_0.3.0          
+[81] purrr_0.3.3            assertthat_0.2.1       xfun_0.8               openxlsx_4.1.5        
+[85] broom_0.5.6            rstatix_0.6.0          survival_2.44-1.1      tibble_3.0.1          
+[89] AnnotationDbi_1.46.0   memoise_1.1.0          IRanges_2.18.1         ellipsis_0.3.0        
+[93] GSEABase_1.46.0       

@@ -1,0 +1,55 @@
+R version 3.6.1 (2019-07-05)
+Platform: x86_64-pc-linux-gnu (64-bit)
+Running under: Ubuntu 18.04.2 LTS
+
+Matrix products: default
+BLAS:   /usr/lib/x86_64-linux-gnu/openblas/libblas.so.3
+LAPACK: /usr/lib/x86_64-linux-gnu/libopenblasp-r0.2.20.so
+
+locale:
+ [1] LC_CTYPE=C.UTF-8       LC_NUMERIC=C           LC_TIME=C.UTF-8        LC_COLLATE=C.UTF-8    
+ [5] LC_MONETARY=C.UTF-8    LC_MESSAGES=C.UTF-8    LC_PAPER=C.UTF-8       LC_NAME=C             
+ [9] LC_ADDRESS=C           LC_TELEPHONE=C         LC_MEASUREMENT=C.UTF-8 LC_IDENTIFICATION=C   
+
+attached base packages:
+ [1] parallel  stats4    grid      stats     graphics  grDevices utils     datasets  methods   base     
+
+other attached packages:
+ [1] rtracklayer_1.44.4   reshape2_1.4.3       GenomicRanges_1.36.1 GenomeInfoDb_1.20.0  IRanges_2.18.1      
+ [6] S4Vectors_0.22.0     BiocGenerics_0.30.0  lemon_0.4.5          viridis_0.5.1        viridisLite_0.3.0   
+[11] ALPACA_0.0.0.9000    pROC_1.16.1          dplyr_0.8.5          ggpubr_0.3.0         ggplot2_3.3.2       
+[16] qvalue_2.16.0        plyr_1.8.4           tidyr_1.0.2          gridExtra_2.3        precrec_0.11        
+[21] jcolors_0.0.4        xtable_1.8-4        
+
+loaded via a namespace (and not attached):
+ [1] colorspace_1.4-1            ggsignif_0.6.0              ellipsis_0.3.0             
+ [4] rio_0.5.16                  XVector_0.24.0              rstudioapi_0.10            
+ [7] bit64_0.9-7                 AnnotationDbi_1.46.0        splines_3.6.1              
+[10] knitr_1.23                  Rsamtools_2.0.3             broom_0.5.6                
+[13] annotate_1.62.0             GO.db_3.8.2                 graph_1.62.0               
+[16] compiler_3.6.1              GOstats_2.50.0              backports_1.1.4            
+[19] assertthat_0.2.1            Matrix_1.2-17               tools_3.6.1                
+[22] igraph_1.2.4.1              gtable_0.3.0                glue_1.3.1                 
+[25] GenomeInfoDbData_1.2.1      Category_2.50.0             Rcpp_1.0.2                 
+[28] carData_3.0-4               Biobase_2.44.0              cellranger_1.1.0           
+[31] vctrs_0.3.1                 Biostrings_2.52.0           gdata_2.18.0               
+[34] nlme_3.1-141                xfun_0.8                    stringr_1.4.0              
+[37] openxlsx_4.1.5              lifecycle_0.2.0             gtools_3.8.2               
+[40] rstatix_0.6.0               XML_3.99-0.3                org.Hs.eg.db_3.8.2         
+[43] zlibbioc_1.30.0             scales_1.0.0                hms_0.5.3                  
+[46] SummarizedExperiment_1.14.1 RBGL_1.60.0                 curl_4.3                   
+[49] memoise_1.1.0               stringi_1.4.3               RSQLite_2.1.2              
+[52] genefilter_1.66.0           condor_1.1.1                caTools_1.18.0             
+[55] zip_2.0.4                   BiocParallel_1.18.1         matrixStats_0.54.0         
+[58] rlang_0.4.5                 pkgconfig_2.0.2             bitops_1.0-6               
+[61] lattice_0.20-38             purrr_0.3.3                 GenomicAlignments_1.20.1   
+[64] bit_1.1-14                  tidyselect_1.0.0            GSEABase_1.46.0            
+[67] AnnotationForge_1.26.0      magrittr_1.5                R6_2.4.0                   
+[70] gplots_3.0.4                generics_0.0.2              DelayedArray_0.10.0        
+[73] DBI_1.0.0                   pillar_1.4.4                haven_2.3.1                
+[76] foreign_0.8-72              withr_2.1.2                 survival_2.44-1.1          
+[79] abind_1.4-5                 RCurl_1.98-1.1              nnet_7.3-12                
+[82] tibble_3.0.1                crayon_1.3.4                car_3.0-8                  
+[85] KernSmooth_2.23-15          readxl_1.3.1                data.table_1.12.2          
+[88] blob_1.2.0                  Rgraphviz_2.28.0            forcats_0.5.0              
+[91] digest_0.6.20               munsell_0.5.0              
