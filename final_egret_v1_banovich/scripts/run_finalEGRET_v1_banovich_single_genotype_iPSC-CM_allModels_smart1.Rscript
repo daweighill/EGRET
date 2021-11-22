@@ -8,6 +8,7 @@ library(tidyr)
 library(data.table)
 library(dplyr)
 library(pandaR)
+writeLines(capture.output(sessionInfo()), "run_finalEGRET_v1_banovich_single_genotype_iPSC-CM_allModels_smart1.sessionInfo")
 
 # this tag should indicate the genotype and the date
 args = commandArgs(trailingOnly=TRUE)

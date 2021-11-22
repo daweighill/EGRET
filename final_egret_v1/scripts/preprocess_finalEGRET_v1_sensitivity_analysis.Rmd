@@ -1,0 +1,406 @@
+---
+title: "finalEGRET v1 preprocessing"
+author: "Deborah Weighill"
+output:
+  html_notebook:
+    toc: true
+    theme: cosmo
+    df_print: paged
+---
+
+# Description
+This R notebook preprocesses the data for input to EGRET. It involves mapping motifs to promotor regions, mapping QTLs to promotor regions and making a VCF file for QTLs for running QBiC. Data used for validation purposes (caQTLs, allele specific binding data) is also preprocessed here. 
+
+We process at multiple thresholds to perform a sensitivity analysis.
+
+# Load libraries and set tag
+
+```{r}
+library(GenomicRanges)
+library(dplyr)
+library(parallel)
+library(tidyr)
+library(data.table)
+
+tag <- "finalEGRET_v1_sensitivity_08172021"
+```
+
+# Gene annotation
+
+```{r}
+# read in the gene annotation file with gene ranges.
+genes <- read.table("../annotation/ensembl_genes_from_ucsc.txt", header = TRUE,sep = "\t")
+
+# for UCSC gene annotations, if the gene is on the negative strand the txStart is actually the txEnd. Also with UCSC, txStart needs a +1 because of the 0-based system.
+genes$promotorLeft <- ifelse(genes$strand == "+", (genes$txStart + 1 - 750), (genes$txEnd-250))
+genes$promotorRight <- ifelse(genes$strand == "+", (genes$txStart + 1 + 250), (genes$txEnd+750))
+
+# make a GRanges object of these promotor ranges
+gr_genes_promotor <- GRanges(seqnames = genes$chrom, ranges = IRanges(start = genes$promotorLeft, end = genes$promotorRight), strand = NULL, mcols = genes[,13:15])
+```
+
+
+# Motif data
+Now we load motif ranges for each TF from the bed files, and we overlap them with the gene promotors
+
+## Map motif ranges to genes - p < 1e-3 
+
+```{r}
+# make a list of the motif bed files to parse
+files <- list.files(path="../motifs/lax_motifs/MotifBedFiles", pattern="*.bed", full.names=TRUE, recursive=FALSE)
+
+# apply this function to every file in the list
+mclapply(files, function(x) {
+  
+  # load file
+  motif <- read.table(x, header = FALSE, sep = "\t")
+  colnames(motif) <- c("chrom","start","stop","pval")
+  motif_thresh <- motif[which(motif$pval < 1e-3),]
+  # apply function to overlap with gene promotor regions
+  name <- strsplit(strsplit(x, "\\/")[[1]][5], "\\.")[[1]][[1]]
+  motif_thresh$motifname <- rep(name, dim(motif_thresh)[1])
+  gr_motif <- GRanges(seqnames = motif_thresh[,1], ranges = IRanges(start = motif_thresh[,2], end = motif_thresh[,3]), strand = NULL, mcols = cbind(motif_thresh$motifname,motif_thresh$pval))
+  motif_promotor_overlap <- data.frame(findOverlaps(gr_motif,gr_genes_promotor))
+  motif_promotor_overlap$tf <- gr_motif$mcols.V1[motif_promotor_overlap$queryHits]
+  motif_promotor_overlap$chr <- as.vector(seqnames(gr_motif))[motif_promotor_overlap$queryHits]
+  motif_promotor_overlap$start <- start(gr_motif)[motif_promotor_overlap$queryHits]
+  motif_promotor_overlap$end <- end(gr_motif)[motif_promotor_overlap$queryHits]
+  motif_promotor_overlap$gene <- gr_genes_promotor$mcols.name2[motif_promotor_overlap$subjectHits]
+  motif_gene_pairs <- distinct(motif_promotor_overlap[,c(3,4,5,6,7)])
+  filename <- paste0("../motifs/mapped_motif_files_1e-3/mapped_motif_promotor_1e-3_",tag,"_",name,".txt")
+  
+  # if there are a non-zero number of entries
+  if(dim(motif_gene_pairs)[1] > 0){
+    # write to file
+    write.table(x = motif_gene_pairs, file = filename, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
+  }
+  }, mc.cores = 30)
+```
+
+## Map motif ranges to genes - p < 1e-4
+```{r}
+# make a list of the motif bed files to parse
+files <- list.files(path="../motifs/lax_motifs/MotifBedFiles", pattern="*.bed", full.names=TRUE, recursive=FALSE)
+
+# apply this function to every file in the list
+mclapply(files, function(x) {
+  
+  # load file
+  motif <- read.table(x, header = FALSE, sep = "\t")
+  colnames(motif) <- c("chrom","start","stop","pval")
+  motif_thresh <- motif[which(motif$pval < 1e-4),]
+  # apply function to overlap with gene promotor regions
+  name <- strsplit(strsplit(x, "\\/")[[1]][5], "\\.")[[1]][[1]]
+  motif_thresh$motifname <- rep(name, dim(motif_thresh)[1])
+  gr_motif <- GRanges(seqnames = motif_thresh[,1], ranges = IRanges(start = motif_thresh[,2], end = motif_thresh[,3]), strand = NULL, mcols = cbind(motif_thresh$motifname,motif_thresh$pval))
+  motif_promotor_overlap <- data.frame(findOverlaps(gr_motif,gr_genes_promotor))
+  motif_promotor_overlap$tf <- gr_motif$mcols.V1[motif_promotor_overlap$queryHits]
+  motif_promotor_overlap$chr <- as.vector(seqnames(gr_motif))[motif_promotor_overlap$queryHits]
+  motif_promotor_overlap$start <- start(gr_motif)[motif_promotor_overlap$queryHits]
+  motif_promotor_overlap$end <- end(gr_motif)[motif_promotor_overlap$queryHits]
+  motif_promotor_overlap$gene <- gr_genes_promotor$mcols.name2[motif_promotor_overlap$subjectHits]
+  motif_gene_pairs <- distinct(motif_promotor_overlap[,c(3,4,5,6,7)])
+  filename <- paste0("../motifs/mapped_motif_files_1e-4/mapped_motif_promotor_1e-4_",tag,"_",name,".txt")
+  
+ if(dim(motif_gene_pairs)[1] > 0){
+    # write to file
+    write.table(x = motif_gene_pairs, file = filename, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
+  }
+  }, mc.cores = 30)
+```
+
+
+## Map motif ranges to genes - p < 1e-5
+```{r}
+# make a list of the motif bed files to parse
+files <- list.files(path="../motifs/lax_motifs/MotifBedFiles", pattern="*.bed", full.names=TRUE, recursive=FALSE)
+
+# apply this function to every file in the list
+mclapply(files, function(x) {
+  
+  # load file
+  motif <- read.table(x, header = FALSE, sep = "\t")
+  colnames(motif) <- c("chrom","start","stop","pval")
+  motif_thresh <- motif[which(motif$pval < 1e-5),]
+  # apply function to overlap with gene promotor regions
+  name <- strsplit(strsplit(x, "\\/")[[1]][5], "\\.")[[1]][[1]]
+  motif_thresh$motifname <- rep(name, dim(motif_thresh)[1])
+  gr_motif <- GRanges(seqnames = motif_thresh[,1], ranges = IRanges(start = motif_thresh[,2], end = motif_thresh[,3]), strand = NULL, mcols = cbind(motif_thresh$motifname,motif_thresh$pval))
+  motif_promotor_overlap <- data.frame(findOverlaps(gr_motif,gr_genes_promotor))
+  motif_promotor_overlap$tf <- gr_motif$mcols.V1[motif_promotor_overlap$queryHits]
+  motif_promotor_overlap$chr <- as.vector(seqnames(gr_motif))[motif_promotor_overlap$queryHits]
+  motif_promotor_overlap$start <- start(gr_motif)[motif_promotor_overlap$queryHits]
+  motif_promotor_overlap$end <- end(gr_motif)[motif_promotor_overlap$queryHits]
+  motif_promotor_overlap$gene <- gr_genes_promotor$mcols.name2[motif_promotor_overlap$subjectHits]
+  motif_gene_pairs <- distinct(motif_promotor_overlap[,c(3,4,5,6,7)])
+  filename <- paste0("../motifs/mapped_motif_files_1e-5/mapped_motif_promotor_1e-5_",tag,"_",name,".txt")
+  
+  if(dim(motif_gene_pairs)[1] > 0){
+    # write to file
+    write.table(x = motif_gene_pairs, file = filename, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
+  }
+  }, mc.cores = 30)
+```
+
+
+## Map motif ranges to genes - p < 1e-6
+```{r}
+# make a list of the motif bed files to parse
+files <- list.files(path="../motifs/lax_motifs/MotifBedFiles", pattern="*.bed", full.names=TRUE, recursive=FALSE)
+
+# apply this function to every file in the list
+mclapply(files, function(x) {
+  
+  # load file
+  motif <- read.table(x, header = FALSE, sep = "\t")
+  colnames(motif) <- c("chrom","start","stop","pval")
+  motif_thresh <- motif[which(motif$pval < 1e-6),]
+  # apply function to overlap with gene promotor regions
+  name <- strsplit(strsplit(x, "\\/")[[1]][5], "\\.")[[1]][[1]]
+  motif_thresh$motifname <- rep(name, dim(motif_thresh)[1])
+  gr_motif <- GRanges(seqnames = motif_thresh[,1], ranges = IRanges(start = motif_thresh[,2], end = motif_thresh[,3]), strand = NULL, mcols = cbind(motif_thresh$motifname,motif_thresh$pval))
+  motif_promotor_overlap <- data.frame(findOverlaps(gr_motif,gr_genes_promotor))
+  motif_promotor_overlap$tf <- gr_motif$mcols.V1[motif_promotor_overlap$queryHits]
+  motif_promotor_overlap$chr <- as.vector(seqnames(gr_motif))[motif_promotor_overlap$queryHits]
+  motif_promotor_overlap$start <- start(gr_motif)[motif_promotor_overlap$queryHits]
+  motif_promotor_overlap$end <- end(gr_motif)[motif_promotor_overlap$queryHits]
+  motif_promotor_overlap$gene <- gr_genes_promotor$mcols.name2[motif_promotor_overlap$subjectHits]
+  motif_gene_pairs <- distinct(motif_promotor_overlap[,c(3,4,5,6,7)])
+  filename <- paste0("../motifs/mapped_motif_files_1e-6/mapped_motif_promotor_1e-6_",tag,"_",name,".txt")
+  
+ if(dim(motif_gene_pairs)[1] > 0){
+    # write to file
+    write.table(x = motif_gene_pairs, file = filename, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
+  }
+  }, mc.cores = 30)
+```
+
+## Make prior file p < 1e-3
+```{r}
+# make a list of the motif bed files to parse
+files <- list.files(path="../motifs/mapped_motif_files_1e-3", pattern="*.txt", full.names=TRUE, recursive=FALSE)
+
+# apply this function to every file in the list
+mclapply(files, function(x) {
+  
+  # load file
+  motif <- read.table(x, header = FALSE, sep = "\t")
+  prior_pairs <- unique(motif[,c(1,5)])
+  name <- strsplit(strsplit(strsplit(x, "\\/")[[1]][[4]], "\\.")[[1]][[1]],"_")[[1]][[9]]
+  filename <- paste0("../motifs/unique_motif_prior_files_1e-3/prior_",tag,"_",name,".txt")
+  
+  if(dim(prior_pairs)[1] > 0){
+    # write to file
+    write.table(x = prior_pairs, file = filename, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
+  }
+
+  }, mc.cores = 30)
+```
+
+## Make prior file p < 1e-4
+```{r}
+# make a list of the motif bed files to parse
+files <- list.files(path="../motifs/mapped_motif_files_1e-4", pattern="*.txt", full.names=TRUE, recursive=FALSE)
+
+# apply this function to every file in the list
+mclapply(files, function(x) {
+  
+  # load file
+  motif <- read.table(x, header = FALSE, sep = "\t")
+  prior_pairs <- unique(motif[,c(1,5)])
+  name <- strsplit(strsplit(strsplit(x, "\\/")[[1]][[4]], "\\.")[[1]][[1]],"_")[[1]][[9]]
+  filename <- paste0("../motifs/unique_motif_prior_files_1e-4/prior_",tag,"_",name,".txt")
+  
+if(dim(prior_pairs)[1] > 0){
+    # write to file
+    write.table(x = prior_pairs, file = filename, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
+  }
+  }, mc.cores = 30)
+```
+
+## Make prior file p < 1e-5
+```{r}
+# make a list of the motif bed files to parse
+files <- list.files(path="../motifs/mapped_motif_files_1e-5", pattern="*.txt", full.names=TRUE, recursive=FALSE)
+
+# apply this function to every file in the list
+mclapply(files, function(x) {
+  
+  # load file
+  motif <- read.table(x, header = FALSE, sep = "\t")
+  prior_pairs <- unique(motif[,c(1,5)])
+  name <- strsplit(strsplit(strsplit(x, "\\/")[[1]][[4]], "\\.")[[1]][[1]],"_")[[1]][[9]]
+  filename <- paste0("../motifs/unique_motif_prior_files_1e-5/prior_",tag,"_",name,".txt")
+  
+if(dim(prior_pairs)[1] > 0){
+    # write to file
+    write.table(x = prior_pairs, file = filename, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
+  }
+  }, mc.cores = 30)
+```
+
+## Make prior file p < 1e-6
+```{r}
+# make a list of the motif bed files to parse
+files <- list.files(path="../motifs/mapped_motif_files_1e-6", pattern="*.txt", full.names=TRUE, recursive=FALSE)
+
+# apply this function to every file in the list
+mclapply(files, function(x) {
+  
+  # load file
+  motif <- read.table(x, header = FALSE, sep = "\t")
+  prior_pairs <- unique(motif[,c(1,5)])
+  name <- strsplit(strsplit(strsplit(x, "\\/")[[1]][[4]], "\\.")[[1]][[1]],"_")[[1]][[9]]
+  filename <- paste0("../motifs/unique_motif_prior_files_1e-6/prior_",tag,"_",name,".txt")
+  
+if(dim(prior_pairs)[1] > 0){
+    # write to file
+    write.table(x = prior_pairs, file = filename, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
+  }
+  }, mc.cores = 30)
+```
+
+
+## concatenate p < 1e-3
+```{r}
+# concatenate the individial tf-gene files
+system("cat /home/ubuntu/EGRET/final_egret_v1/motifs/unique_motif_prior_files_1e-3/* >/home/ubuntu/EGRET/final_egret_v1/prior/prior_motif_true1_pairs_sensitivity_1e-3_08182021.txt")
+
+#read in the concatenated file, "fill it out" with zeros making a complete bipartite graph and then save to an RData object.
+motif <- read.table("/home/ubuntu/EGRET/final_egret_v1/prior/prior_motif_true1_pairs_sensitivity_1e-3_08182021.txt", header = FALSE)
+colnames(motif) <- c("tf","gene")
+motif$edgeP <- rep(1,nrow(motif))
+panda_prior <- complete(motif, tf, gene, fill = list(edgeP = 0))
+save(panda_prior, file = "../inputs/panda_motif_prior_sensitivity_1e-3.RData")
+```
+
+## concatenate p < 1e-4
+```{r}
+# concatenate the individial tf-gene files
+system("cat /home/ubuntu/EGRET/final_egret_v1/motifs/unique_motif_prior_files_1e-4/* >/home/ubuntu/EGRET/final_egret_v1/prior/prior_motif_true1_pairs_sensitivity_1e-4_08182021.txt")
+
+#read in the concatenated file, "fill it out" with zeros making a complete bipartite graph and then save to an RData object.
+motif <- read.table("/home/ubuntu/EGRET/final_egret_v1/prior/prior_motif_true1_pairs_sensitivity_1e-4_08182021.txt", header = FALSE)
+colnames(motif) <- c("tf","gene")
+motif$edgeP <- rep(1,nrow(motif))
+panda_prior <- complete(motif, tf, gene, fill = list(edgeP = 0))
+save(panda_prior, file = "../inputs/panda_motif_prior_sensitivity_1e-4.RData")
+```
+
+
+## concatenate p < 1e-5
+```{r}
+# concatenate the individial tf-gene files
+system("cat /home/ubuntu/EGRET/final_egret_v1/motifs/unique_motif_prior_files_1e-5/* >/home/ubuntu/EGRET/final_egret_v1/prior/prior_motif_true1_pairs_sensitivity_1e-5_08182021.txt")
+
+#read in the concatenated file, "fill it out" with zeros making a complete bipartite graph and then save to an RData object.
+motif <- read.table("/home/ubuntu/EGRET/final_egret_v1/prior/prior_motif_true1_pairs_sensitivity_1e-5_08182021.txt", header = FALSE)
+colnames(motif) <- c("tf","gene")
+motif$edgeP <- rep(1,nrow(motif))
+panda_prior <- complete(motif, tf, gene, fill = list(edgeP = 0))
+save(panda_prior, file = "../inputs/panda_motif_prior_sensitivity_1e-5.RData")
+```
+
+## concatenate p < 1e-6
+```{r}
+# concatenate the individial tf-gene files
+system("cat /home/ubuntu/EGRET/final_egret_v1/motifs/unique_motif_prior_files_1e-6/* >/home/ubuntu/EGRET/final_egret_v1/prior/prior_motif_true1_pairs_sensitivity_1e-6_08182021.txt")
+
+#read in the concatenated file, "fill it out" with zeros making a complete bipartite graph and then save to an RData object.
+motif <- read.table("/home/ubuntu/EGRET/final_egret_v1/prior/prior_motif_true1_pairs_sensitivity_1e-6_08182021.txt", header = FALSE)
+colnames(motif) <- c("tf","gene")
+motif$edgeP <- rep(1,nrow(motif))
+panda_prior <- complete(motif, tf, gene, fill = list(edgeP = 0))
+save(panda_prior, file = "../inputs/panda_motif_prior_sensitivity_1e-6.RData")
+```
+
+# eQTLs 1e-6 in motifs [normal]
+```{r}
+eqtlthresh <- 1e-6
+# load eQTL data and overlap with motifs
+eqtl <- read.table("../pop_data/GTEx_Analysis_v7_eQTL/Cells_EBV-transformed_lymphocytes.v7.signif_variant_gene_pairs.txt", header = 1)
+#split the first column to get chromosome, position and ID columns and add the "chr" tag
+eqtl <- separate(eqtl, variant_id, c("chr", "pos"), "_", remove = FALSE)
+eqtl$chr = paste0("chr",eqtl$chr)
+eqtl <- separate(eqtl, gene_id, c("geneID"), "\\.", remove = TRUE)
+eqtl_thresh <- eqtl[which(eqtl$pval_nominal < eqtlthresh),]
+#Convert the data into a GRanges object
+gr_eqtl <- GRanges(seqnames = eqtl_thresh$chr, ranges = IRanges(start = as.numeric(eqtl_thresh$pos), end = as.numeric(eqtl_thresh$pos)), strand = NULL, mcols=eqtl_thresh[,c("geneID", "pval_beta","slope","pval_nominal")])
+
+ 
+  # make motif-eGene network
+  my_path <- paste0("../motifs/mapped_motif_files/")
+  motifs <- list.files(path=my_path, pattern="*.txt", full.names=TRUE, recursive=FALSE)
+  lapply(motifs, function(y) {
+    # load file
+    motif <- read.table(y, header = FALSE, sep = "\t")
+    motif_name <- motif[1,1]
+    print(motif_name)
+    colnames(motif) <- c("motifName","chr","start","stop","adjacentGene")
+    gr_motif <- GRanges(seqnames = motif[,2], ranges = IRanges(start = motif[,3], end = motif[,4]), strand = NULL, mcols = motif[,c(1,5)])
+  
+    eqtl_motif_overlap <- data.frame(findOverlaps(gr_eqtl,gr_motif))
+    eqtl_motif_overlap$tfName <- gr_motif$mcols.motifName[eqtl_motif_overlap$subjectHits]
+    eqtl_motif_overlap$adjacentGene <- gr_motif$mcols.adjacentGene[eqtl_motif_overlap$subjectHits]
+    eqtl_motif_overlap$eGene <- gr_eqtl$mcols.geneID[eqtl_motif_overlap$queryHits]
+    eqtl_motif_overlap$snpPos <- start(gr_eqtl)[eqtl_motif_overlap$queryHits]
+    eqtl_motif_overlap$chr <- as.vector(seqnames(gr_eqtl))[eqtl_motif_overlap$queryHits]
+    eqtl_motif_overlap$pvalNom <- gr_eqtl$mcols.pval_nominal[eqtl_motif_overlap$queryHits]
+    eqtl_motif_overlap$pvalBeta <- gr_eqtl$mcols.pval_beta[eqtl_motif_overlap$queryHits]
+    eqtl_motif_overlap$beta <- gr_eqtl$mcols.slope[eqtl_motif_overlap$queryHits]
+    indices <- which(as.vector(eqtl_motif_overlap$eGene) == as.vector(eqtl_motif_overlap$adjacentGene))
+    eQTL_in_promotor_adjacent_egene <- eqtl_motif_overlap[indices,]
+  
+    filename <- paste0("../inputs/eQTL_",eqtlthresh,"_in_motif_promotor_adjacent_egene_sensitivity_08182021.txt")
+    # write to file
+    write.table(x = eQTL_in_promotor_adjacent_egene[,c(3,4,6,7,10)], file = filename, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE, append = TRUE)
+  })
+```
+
+# eQTLs 1e-7 in motifs [normal]
+```{r}
+eqtlthresh <- 1e-7
+# load eQTL data and overlap with motifs
+eqtl <- read.table("../pop_data/GTEx_Analysis_v7_eQTL/Cells_EBV-transformed_lymphocytes.v7.signif_variant_gene_pairs.txt", header = 1)
+#split the first column to get chromosome, position and ID columns and add the "chr" tag
+eqtl <- separate(eqtl, variant_id, c("chr", "pos"), "_", remove = FALSE)
+eqtl$chr = paste0("chr",eqtl$chr)
+eqtl <- separate(eqtl, gene_id, c("geneID"), "\\.", remove = TRUE)
+eqtl_thresh <- eqtl[which(eqtl$pval_nominal < eqtlthresh),]
+#Convert the data into a GRanges object
+gr_eqtl <- GRanges(seqnames = eqtl_thresh$chr, ranges = IRanges(start = as.numeric(eqtl_thresh$pos), end = as.numeric(eqtl_thresh$pos)), strand = NULL, mcols=eqtl_thresh[,c("geneID", "pval_beta","slope","pval_nominal")])
+
+ 
+  # make motif-eGene network
+  my_path <- paste0("../motifs/mapped_motif_files/")
+  motifs <- list.files(path=my_path, pattern="*.txt", full.names=TRUE, recursive=FALSE)
+  lapply(motifs, function(y) {
+    # load file
+    motif <- read.table(y, header = FALSE, sep = "\t")
+    motif_name <- motif[1,1]
+    print(motif_name)
+    colnames(motif) <- c("motifName","chr","start","stop","adjacentGene")
+    gr_motif <- GRanges(seqnames = motif[,2], ranges = IRanges(start = motif[,3], end = motif[,4]), strand = NULL, mcols = motif[,c(1,5)])
+  
+    eqtl_motif_overlap <- data.frame(findOverlaps(gr_eqtl,gr_motif))
+    eqtl_motif_overlap$tfName <- gr_motif$mcols.motifName[eqtl_motif_overlap$subjectHits]
+    eqtl_motif_overlap$adjacentGene <- gr_motif$mcols.adjacentGene[eqtl_motif_overlap$subjectHits]
+    eqtl_motif_overlap$eGene <- gr_eqtl$mcols.geneID[eqtl_motif_overlap$queryHits]
+    eqtl_motif_overlap$snpPos <- start(gr_eqtl)[eqtl_motif_overlap$queryHits]
+    eqtl_motif_overlap$chr <- as.vector(seqnames(gr_eqtl))[eqtl_motif_overlap$queryHits]
+    eqtl_motif_overlap$pvalNom <- gr_eqtl$mcols.pval_nominal[eqtl_motif_overlap$queryHits]
+    eqtl_motif_overlap$pvalBeta <- gr_eqtl$mcols.pval_beta[eqtl_motif_overlap$queryHits]
+    eqtl_motif_overlap$beta <- gr_eqtl$mcols.slope[eqtl_motif_overlap$queryHits]
+    indices <- which(as.vector(eqtl_motif_overlap$eGene) == as.vector(eqtl_motif_overlap$adjacentGene))
+    eQTL_in_promotor_adjacent_egene <- eqtl_motif_overlap[indices,]
+  
+    filename <- paste0("../inputs/eQTL_",eqtlthresh,"_in_motif_promotor_adjacent_egene_sensitivity_08182021.txt")
+    # write to file
+    write.table(x = eQTL_in_promotor_adjacent_egene[,c(3,4,6,7,10)], file = filename, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE, append = TRUE)
+  })
+```
+
+
+
+
+

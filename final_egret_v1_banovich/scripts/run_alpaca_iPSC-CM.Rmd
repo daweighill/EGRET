@@ -28,6 +28,7 @@ library("org.Hs.eg.db")
 library(condor)
 library(GO.db)
 library(ALPACA)
+writeLines(capture.output(sessionInfo()), "run_alpaca_iPSC-CM.sessionInfo")
 
 ```
 `

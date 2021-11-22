@@ -18,6 +18,7 @@ library(GenomicRanges)
 library(tidyr)
 library(data.table)
 library(preprocessCore)
+writeLines(capture.output(sessionInfo()), "preprocess_finalEgret_v1_banovich.sessionInfo")
 ```
 
 # Gene annotation

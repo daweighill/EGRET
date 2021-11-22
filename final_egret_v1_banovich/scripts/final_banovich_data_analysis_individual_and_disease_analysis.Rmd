@@ -1,7 +1,7 @@
 ---
 title: "Analysis of EGRET networks"
 author: "Deborah Weighill"
-subtitle: Analysis of EGRET networks derived from 119 individuals and 3 cell types
+subtitle: "Analysis of EGRET networks derived from 119 individuals and 3 cell types"
   (Banovich et al dataset)
 output:
   html_document:
@@ -25,6 +25,7 @@ library(reshape2)
 library(jcolors)
 library(ALPACA)
 library(gridExtra)
+library(extrafont)
 library(grid)
 library(gridExtra)
 library(ggthemes)
@@ -38,6 +39,7 @@ pallet <- c("#FFBF00",  "#870E75"  ,  "#0BB19F" )
 logfile <- paste0("../outputs/log_egret_population_analysis_banovichData.txt")
 write(date(), file = logfile, append = FALSE)
 
+writeLines(capture.output(sessionInfo()), "final_banovich_data_analysis_individual_and_disease_analysis.sessionInfo")
 ```
 
 # Data loading and parsing: Make Panda/EGRET edge table
@@ -484,6 +486,7 @@ dev.off()
 
 ## Plots of ALPACA scores for top disease genes in relevant cell type
 
+
 ```{r message=FALSE}
 data <- merged_alpaca_table_qq_sc
 only_CAD_genes <- as.vector(CAD$gene)[which(!((as.vector(CAD$gene) %in% as.vector(CD$gene))))]
@@ -492,35 +495,63 @@ cads_melted <- melt(cads)
 colnames(cads_melted) <- c("node","sample","alpaca_score")
 cads_melted <- separate(cads_melted, sample, c("cellType","tag", "indiv"), "_", remove = TRUE)
 cads_melted$cellType[which(cads_melted$cellType == "iPSCCM")] <- "CM"
-high_score_nodes_cad <- unique(cads_melted[which(((cads_melted$alpaca_score) > 1.7) & (cads_melted$cellType == "CM")),'node'])
-cads <- data[which(data$node %in% high_score_nodes_cad),c(1:358)]
+ggplot(cads_melted) + geom_violin(aes(x = cellType, y = (alpaca_score), fill = cellType, col = cellType)) + theme_classic()+ scale_fill_manual(values=pallet[c(2,1,3)]) + scale_color_manual(values=pallet[c(2,1,3)])+ labs(y = "DM score",x = "Cell type", title = "Top CAD genes in CMs") + theme(legend.position = "none") 
+
+cads_melted_cm <- cads_melted[which(cads_melted$cellType == "CM"),]
+top_10_perc_cm_cad <- top_frac(cads_melted_cm,0.1,alpaca_score)
+top_10_perc_cm_genes_cad <- unique(top_10_perc_cm_cad$node)
+
+
+cads <- data[which(data$node %in% top_10_perc_cm_genes_cad),c(1:358)]
 cads_melted <- melt(cads)
 colnames(cads_melted) <- c("node","sample","alpaca_score")
 cads_melted <- separate(cads_melted, sample, c("cellType","tag", "indiv"), "_", remove = TRUE)
 cads_melted$cellType[which(cads_melted$cellType == "iPSCCM")] <- "CM"
-cad_alpaca_plot <- ggplot(cads_melted) + geom_violin(aes(x = cellType, y = (alpaca_score), fill = cellType, col = cellType)) + theme_classic()+ scale_fill_manual(values=pallet[c(2,1,3)]) + scale_color_manual(values=pallet[c(2,1,3)])+ labs(y = "DM score",x = "Cell type", title = "Top CAD genes in CMs") + theme(legend.position = "none") 
+cad_alpaca_plot <- ggplot(cads_melted) + geom_violin(aes(x = cellType, y = (alpaca_score), fill = cellType, col = cellType)) + theme_classic()+ scale_fill_manual(values=pallet[c(2,1,3)]) + scale_color_manual(values=pallet[c(2,1,3)])+ labs(y = "DM score",x = "Cell type", title = "High-DM-score CAD genes in CMs") + theme(legend.position = "none") 
 cad_alpaca_plot <- annotate_figure(cad_alpaca_plot,fig.lab = "A", fig.lab.face = "plain", fig.lab.pos = "top.left", fig.lab.size = 14)
+
 
 only_CD_genes <- as.vector(CD$gene)[which(!((as.vector(CD$gene) %in% as.vector(CAD$gene))))]
 cds <- data[which(data$node %in% CD$gene),c(1:358)]
 cds_melted <- melt(cds)
 colnames(cds_melted) <- c("node","sample","alpaca_score")
 cds_melted <- separate(cds_melted, sample, c("cellType","tag", "indiv"), "_", remove = TRUE)
-high_score_nodes_cd <- unique(cds_melted[which((abs(cds_melted$alpaca_score) > 1.7) & (cds_melted$cellType == "LCL")),'node'])
-cds <- data[which(data$node %in% high_score_nodes_cd),c(1:358)]
+
+cds_melted_lcl <- cds_melted[which(cds_melted$cellType == "LCL"),]
+top_10_perc_lcl_cd <- top_frac(cds_melted_lcl,0.1,alpaca_score)
+top_10_perc_lcl_genes_cd <- unique(top_10_perc_lcl_cd$node)
+
+cds <- data[which(data$node %in% top_10_perc_lcl_genes_cd),c(1:358)]
 cds_melted <- melt(cds)
 colnames(cds_melted) <- c("node","sample","alpaca_score")
 cds_melted <- separate(cds_melted, sample, c("cellType","tag", "indiv"), "_", remove = TRUE)
 cds_melted$cellType[which(cds_melted$cellType == "iPSCCM")] <- "CM"
-cd_alpaca_plot <- ggplot(cds_melted) + geom_violin(aes(x = cellType, y = (alpaca_score), fill = cellType, col = cellType)) + theme_classic()+ scale_fill_manual(values=pallet[c(2,1,3)]) + scale_color_manual(values=pallet[c(2,1,3)])+ labs(y = "DM score",x = "Cell type", title  = "Top CD genes in LCLs") + theme(legend.position = "none") 
+cd_alpaca_plot <- ggplot(cds_melted) + geom_violin(aes(x = cellType, y = (alpaca_score), fill = cellType, col = cellType)) + theme_classic()+ scale_fill_manual(values=pallet[c(2,1,3)]) + scale_color_manual(values=pallet[c(2,1,3)])+ labs(y = "DM score",x = "Cell type", title  = "High-DM-score CD genes in LCLs") + theme(legend.position = "none") 
 cd_alpaca_plot <- annotate_figure(cd_alpaca_plot,fig.lab = "B", fig.lab.face = "plain", fig.lab.pos = "top.left", fig.lab.size = 14)
 
 combined_plot <- grid.arrange(cad_alpaca_plot, cd_alpaca_plot, nrow=1, widths = c(3,3))
 combined_plot_annotated <- annotate_figure(combined_plot,top = text_grob("Distribution of differential modularity scores", color = "black", face = "bold", size = 14))
 
-pdf("../figures/alpaca_scores.pdf",width = 6, height = 2.7)
+pdf("../figures/alpaca_scores092021.pdf",width = 7, height = 2.7)
 plot(combined_plot)
 dev.off()
+```
+
+
+```{r}
+high_dm_cad <- as.vector(cads_melted[which(((cads_melted$alpaca_score) > 1.7) & (cads_melted$cellType == "CM")),'node'])
+low_dm_cad <- as.vector(cads_melted[which(((cads_melted$alpaca_score) <= 1.7) & (cads_melted$cellType == "CM")),'node'])
+length(high_dm_cad)
+length(low_dm_cad)
+length(high_dm_cad)/(length(low_dm_cad) + length(high_dm_cad))
+
+high_dm_cd <- as.vector(cds_melted[which(((cds_melted$alpaca_score) > 1.7) & (cds_melted$cellType == "LCL")),'node'])
+low_dm_cd <- as.vector(cds_melted[which(((cds_melted$alpaca_score) <= 1.7) & (cds_melted$cellType == "LCL")),'node'])
+length(high_dm_cd)
+length(low_dm_cd)
+length(high_dm_cd)/(length(low_dm_cd) + length(high_dm_cd))
+
+
 ```
 
 

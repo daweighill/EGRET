@@ -24,6 +24,8 @@ library(PRROC)
 library(dplyr)
 library(GenomicRanges)
 library(precrec)
+
+writeLines(capture.output(sessionInfo()), "egret_datatype_contribution.sessionInfo")
 ```
 
 
@@ -143,8 +145,6 @@ perc_improvement
 # Validate likely variant-impacted edges
 
 ```{r,results='hide',fig.show=TRUE}
-library(precrec)
-library(ggplot2)
 
 names <- c("onlyQTL","onlyQbic","noQBiC","allDataTypes")
 diff_cols <- c(13,14,15,16)

@@ -43,6 +43,8 @@ chipseq_k562 <- "../chipseq/K562_remap2018_all_macs2_hg19_v1_2.bed"
 logfile <- paste0("../outputs/log_cell_line_comparison.txt")
 write(date(), file = logfile, append = FALSE)
 
+writeLines(capture.output(sessionInfo()), "cell_line_genotype_validation_09162020.sessionInfo")
+
 ```
 
 # Create validation table for GM12878

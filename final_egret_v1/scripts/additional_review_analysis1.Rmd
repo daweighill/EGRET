@@ -1,0 +1,426 @@
+---
+title: "Additional review analysis 1"
+author: "Deborah Weighill"
+output:
+  html_notebook:
+    toc: true
+    theme: cosmo
+    df_print: paged
+---
+___
+# Description
+___
+
+Creating EGRET priors for GM12878. 
+
+# Libraries and tags
+```{r libraries_and_tags, message=FALSE}
+Sys.setenv(RSTUDIO_PANDOC="/usr/lib/rstudio-server/bin/pandoc")
+
+# load the libraries we will need.
+library(GenomicRanges)
+library(IRanges)
+library(tidyr)
+library(ggpubr)
+library(data.table)
+library(dplyr)
+library(pandaR)
+library(reshape2)
+library(rtracklayer)
+library(gprofiler2)
+library(ggplot2)
+library(pROC)
+library(reshape)
+library(PRROC)
+library(precrec)
+library(resolution)
+library(igraph)
+library(ggvenn)
+library(RColorBrewer)
+library(condor)
+
+
+# this tag should indicate the genotype and the date
+tag <- "review_analysis_1_07272021"
+
+
+```
+
+# Addressing R2.1.1
+The reviewer's comment:
+*"I would like to see more details on how many eQTL variants are considered per gene on average. Is this limited to lead eQTL variants (and hence the sum has essentially one element), or multiple ones ?"*
+
+We will make distributions of the number of eQTLs per gene/edge to address this comment.
+
+## Inputs
+Individual inputs:
+```{r individual_inputs}
+
+qbic <- read.table(file = "../inputs/qbic_eQTLS_GM12878_K562_finalEGRET_v1_06302020_allModels_smart1.txt", header = FALSE)
+
+  
+# individual genotype
+vcf <- read.table("../genotype_data/NA12878.vcf", header = FALSE, sep = "\t")
+```
+
+General inputs:
+```{r general_inputs}
+
+# general motif prior
+motif <- load("../inputs/panda_motif_prior_finalEGRET_v1.RData")
+
+# population-level QTL data
+qtl <- read.table("../inputs/eQTL_in_motif_promotor_adjacent_egene_finalEGRET_v1_06172020.txt", header = FALSE)
+
+```
+
+## QTL data
+```{r parse_qtl}
+#these QTLs are those which exist within motifs within promotors.
+colnames(qtl) <- c("tf",	"gene", "snpPos",	"chr",	"effect")
+qtl$snpID <- paste0(qtl$chr,"_",qtl$snpPos)
+```
+
+## qbic data for QTLs
+```{r parse_qbic_eqtl}
+colnames(qbic) <- c("snpID",	"tf",	"gene",	"qbicEffectSize","qbicEffect")
+
+# aggregate the qbic data per SNP -> function to return the maximum effect size of a qbic SNP 
+maxabs <- function(x){
+  location <- which(abs(x) == max(abs(x)))
+  return(x[location])
+}
+qbic_uniq <- distinct(qbic)
+qbic_uniq$catid <- paste0(qbic_uniq$snpID,qbic_uniq$tf,qbic_uniq$gene,qbic_uniq$qbicEffectSize)
+
+qbic_ag <- aggregate(qbic_uniq$qbicEffectSize, by = list(qbic_uniq$snpID,qbic_uniq$tf,qbic_uniq$gene), FUN = maxabs)
+colnames(qbic_ag) <- c("snpID","tf","gene","qbicEffectSize")
+qbic_ag$catid <- paste0(qbic_ag$snpID,qbic_ag$tf,qbic_ag$gene,qbic_ag$qbicEffectSize)
+qbic_ag$qbicEffect <- qbic_uniq$qbicEffect[match(qbic_ag$catid,qbic_uniq$catid)]
+
+#absQbicEffectSize - absolute value of the qbic effect (which is negative)
+qbic_ag$absQbicEffectSize <- abs(qbic_ag$qbicEffectSize)
+```
+
+## Calculating alt allele count for each qbic SNP.
+Label each eqtl snp with the alternate allele count for the genotype in question (here NA12878)
+```{r parse_genotype}
+colnames(vcf) <- c("CHROM",  "POS"  ,   "ID"  ,    "REF"  ,   "ALT"   ,  "QUAL"   , "FILTER" , "INFO"   , "FORMAT", "NA12878")
+snp_ids <- paste0(vcf$CHROM,"_",vcf$POS)
+rownames(vcf) <- snp_ids
+vcf <- separate(vcf, NA12878, c("allele1", "allele2"), "\\|", remove = TRUE)
+vcf$alt_allele_count <- as.numeric(vcf$allele1) + as.numeric(vcf$allele2)
+vcf$snp_id <- snp_ids
+
+#assign alt allele count of the individual to the qbic table
+qbic_ag$alt_allele_count <- vcf$alt_allele_count[match(qbic_ag$snpID, vcf$snp_id)]
+
+#assign alt allele count of the individual to the QTL table
+qtl$alt_allele_count <- vcf$alt_allele_count[match(qtl$snpID, vcf$snp_id)]
+QTL_tf_gene_pairs <- distinct(qtl[,c(1:7)])
+QTL_tf_gene_pairs$edgeE <- rep(1,nrow(QTL_tf_gene_pairs))
+QTL_tf_gene_pairs$alt_allele_count[is.na(QTL_tf_gene_pairs$alt_allele_count)] <- 0
+QTL_tf_gene_pairs$qtlTF <- paste0(QTL_tf_gene_pairs$tf,QTL_tf_gene_pairs$snpID)
+```
+
+```{r}
+qtl_edge_table <- distinct(QTL_tf_gene_pairs[,c(1,2,6,8)])
+qtl_gene_table <- distinct(QTL_tf_gene_pairs[,c(2,6,8)])
+
+# number of eQTLs per gene promoter
+eqtls_per_gene <- aggregate(edgeE ~ gene, data=qtl_gene_table, FUN=sum)
+colnames(eqtls_per_gene) <- c("gene_promoter","num_eQTLs")
+length(unique(qtl_gene_table$gene))
+length(unique(qtl_gene_table$snpID))
+eqtls_per_gene[which(eqtls_per_gene$num_eQTLs == max(eqtls_per_gene$num_eQTLs)),]
+most_snps <- qtl_gene_table[which(qtl_gene_table$gene=="ENSG00000179344"),]
+length(unique(most_snps$snpID))
+
+p1 <- ggplot(eqtls_per_gene, aes(x=num_eQTLs)) + geom_histogram(binwidth = 1, col="navy", fill="navy")+ theme_bw() + labs(x="Number of eQTLs per gene",y="Frequency")
+#pdf("../figures/eQTLs_per_gene.pdf",width = 10, height = 4)
+plot(p1)
+#dev.off()
+
+qtl_edge_table$edgeID <- paste0(qtl_edge_table$tf,qtl_edge_table$gene)
+eqtls_per_edge <- aggregate(edgeE ~ edgeID, data=qtl_edge_table, FUN=sum)
+colnames(eqtls_per_edge) <- c("edge","num_eQTLs")
+p2 <- ggplot(eqtls_per_edge, aes(x=num_eQTLs))  + geom_histogram(binwidth = 1, col="navy", fill="navy")+ theme_bw() + labs(x="Number of eQTLs per edge",y="Frequency")
+#pdf("../figures/eQTLs_per_edge.pdf",width = 10, height = 4)
+plot(p2)
+#dev.off()
+```
+
+## Construct modifiers
+
+Now we need to annotate each QTL with its qbic effect (some will be zero as they have no qbic effect.) Add the qbic effects to the qtl table.
+
+```{r combine_qbic_eqtl}
+
+qbic_ag$snpTF <- paste0(qbic_ag$tf,qbic_ag$snpID)
+# we can match like this because the qbic effect of a SNP on a tf is the same no matter what nearby gene it is assigned to.
+QTL_tf_gene_pairs$qbicEffectSize <- qbic_ag$qbicEffectSize[match(QTL_tf_gene_pairs$qtlTF, qbic_ag$snpTF)]
+QTL_tf_gene_pairs$qbicEffect <- qbic_ag$qbicEffect[match(QTL_tf_gene_pairs$qtlTF, qbic_ag$snpTF)]
+QTL_tf_gene_pairs$absQbicEffectSize <- qbic_ag$absQbicEffectSize[match(QTL_tf_gene_pairs$qtlTF, qbic_ag$snpTF)]
+QTL_tf_gene_pairs[is.na(QTL_tf_gene_pairs)] <- 0
+
+# now we make our "per SNP" combinations (i.e. products of eQTL and qbic variables)
+QTL_tf_gene_pairs$absQtlQffect_altAlleleCount_qbicEffect <- abs(QTL_tf_gene_pairs$effect) * QTL_tf_gene_pairs$alt_allele_count * QTL_tf_gene_pairs$qbicEffect
+
+
+mod_snps_genes <- distinct(QTL_tf_gene_pairs[which(QTL_tf_gene_pairs$absQtlQffect_altAlleleCount_qbicEffect != 0),c(2,6,8)])
+mod_snps_edges <- distinct(QTL_tf_gene_pairs[which(QTL_tf_gene_pairs$absQtlQffect_altAlleleCount_qbicEffect != 0),c(1,2,6,8)])
+
+
+# number of eQTLs per gene promoter
+mod_eqtls_per_gene <- aggregate(edgeE ~ gene, data=mod_snps_genes, FUN=sum)
+colnames(mod_eqtls_per_gene) <- c("gene_promoter","num_eQTLs")
+length(unique(mod_snps_genes$gene))
+length(unique(mod_snps_genes$snpID))
+
+p3 <- ggplot(mod_eqtls_per_gene, aes(x=num_eQTLs)) + geom_histogram(binwidth = 1, col="navy", fill="navy")+ theme_bw() + labs(x="Number of disruptive eQTLs per gene",y="Frequency")
+#pdf("../figures/MOD_eQTLs_per_gene.pdf",width = 10, height = 4)
+plot(p3)
+#dev.off()
+
+
+mod_snps_edges$edgeID <- paste0(mod_snps_edges$tf,mod_snps_edges$gene)
+mod_eqtls_per_edge <- aggregate(edgeE ~ edgeID, data=mod_snps_edges, FUN=sum)
+colnames(mod_eqtls_per_edge) <- c("edge","num_eQTLs")
+p4 <- ggplot(mod_eqtls_per_edge, aes(x=num_eQTLs)) + geom_histogram(binwidth = 1, col="navy", fill="navy")+ theme_bw() + labs(x="Number of disruptive eQTLs per edge",y="Frequency")
+#pdf("../figures/MOD_eQTLs_per_edge.pdf",width = 10, height = 4)
+plot(p4)
+#dev.off()
+```
+
+```{r}
+p_ag <- ggarrange(p1,p2,p3,p4,
+          labels = c("A", "B", "C", "D"),
+          ncol = 2, nrow = 2)
+
+pdf("../figures/eQTLs_per_edgegene_dist.pdf",width = 8, height = 5)
+plot(p_ag)
+dev.off()
+```
+These figures address R2.1.2.
+
+# Addressing R2.2.1
+*``Evaluation and benchmark. The first evaluation (Section 2.1) appears to primarily address direct genetic dysregulation and I wonder what the effect of the elaborate message passing scheme is that combines the genotype-specific evidence with (non-specific) data. If I understand the benchmark correctly, this result is a direct consequence of the use of eQTL effects that are reflected in the genotype-specific component of the model. Related to this, can the authors demonstrate that the refinement of E adds has practical value?''*
+
+We will show how message passing improfves the overall AUC.
+
+## Load networks to compare, including prior, message passing only with C, only P, and then everything.
+```{r}
+
+# panda network
+load("../outputs/EGRET_allQBiCModels_gm12878_10142020_panda.RData")
+net <- melt(regnet)
+colnames(net) = c("tf","gene","score")
+net$id <- paste0(net$tf,net$gene)
+
+regnet_edge_table <- data.frame(net$id)
+colnames(regnet_edge_table) <- c("id")
+regnet_edge_table$tf <- as.vector(net$tf)
+regnet_edge_table$gene <- as.vector(net$gene)
+regnet_edge_table$panda <- as.vector(net$score)
+
+
+prior <- read.table("~/EGRET/final_egret_v1/outputs/priors_EGRET_allQBiCModels_gm12878_10142020.txt", sep = "\t", header = TRUE)
+prior$id <- paste0(prior$tf, prior$gene)
+regnet_edge_table$egretPrior <- prior$egretPrior[match(regnet_edge_table$id, prior$id)]
+regnet_edge_table$pandaPrior <- prior$edgeP[match(regnet_edge_table$id, prior$id)]
+#list of the file names of the rest of the networks
+files <- c("finalEGRET_v1_noExpr_noPPI_gm12878_egret.RData",
+           "finalEGRET_v1_noExpr_noPPI_gm12878_panda.RData",
+           "EGRET_allQBiCModels_gm12878_10142020_egret.RData")
+
+#nicknames of the networks
+names <- c("egret_noExp_noPPI","panda_noExp_noPPI","egret_allDataTypes")
+
+for (p in c(1:3)) {
+  filename <- paste0("../outputs/",files[p])
+  netname <- names[p]
+  print(netname)
+  load(filename)
+  net <- melt(regnet)
+  colnames(net) = c("tf","gene","score")
+  net$id <- paste0(net$tf,net$gene)
+  if(all.equal(as.vector(regnet_edge_table$id),as.vector(net$id))){
+    print(p)
+    regnet_edge_table$tempID <- as.vector(net$score)
+    #print(colnames(regnet_edge_table))
+    colnames(regnet_edge_table)[colnames(regnet_edge_table) == "tempID"] <- netname
+  }
+}
+save(regnet_edge_table, file = "../outputs/message_passing_effect_networks_review_analysis_1_07272021.RData")
+```
+
+
+## Load ChIP-seq data and Overlap networks with ChIP-seq
+We load the chipseq data and make a ground truth regulatory network for validation.
+
+```{r echo=FALSE,results='hide'}
+load("../outputs/message_passing_effect_networks_review_analysis_1_07272021.RData")
+# read in the gene annotation file with gene ranges.
+genes <- read.table("../annotation/ensembl_genes_from_ucsc.txt", header = TRUE,sep = "\t")
+genes$promotorLeft <- ifelse(genes$strand == "+", (genes$txStart + 1 - 750), (genes$txEnd-250))
+genes$promotorRight <- ifelse(genes$strand == "+", (genes$txStart + 1 + 250), (genes$txEnd+750))
+gr_genes_promotor <- GRanges(seqnames = genes$chrom, ranges = IRanges(start = genes$promotorLeft, end = genes$promotorRight), strand = NULL, mcols = genes[,13:15])
+
+# GM12878 chipseq data
+gr_chipseq_gm12878 <- import("../chipseq/GM12878_remap2018_all_macs2_hg19_v1_2.bed")
+overlaps_gm12878 <- data.frame(findOverlaps(gr_chipseq_gm12878, gr_genes_promotor))
+overlaps_gm12878$tf_name <- gr_chipseq_gm12878$name[overlaps_gm12878$queryHits]
+overlaps_gm12878$gene_name <- gr_genes_promotor$mcols.name2[overlaps_gm12878$subjectHits]
+validation_regnet_gm12878 <- separate(overlaps_gm12878, tf_name, c("exp", "tf", "cell line"), "\\.")
+chipseq_regnet_gm12878 <- distinct(validation_regnet_gm12878[,c("tf","gene_name")])
+chipseq_regnet_gm12878$id <- paste0(chipseq_regnet_gm12878$tf,chipseq_regnet_gm12878$gene)
+
+filtered_net_table_gm12878 <- regnet_edge_table[(regnet_edge_table$tf %in% chipseq_regnet_gm12878$tf) ,]
+filtered_net_table_gm12878$chipseq <- ifelse(filtered_net_table_gm12878$id %in% chipseq_regnet_gm12878$id,1,0)
+```
+
+
+## Validate networks against ChIP-seq
+
+Plot ROC/PR curves for each PANDA and EGRET nework, as well as table of AUCs and PRs
+```{r}
+# GM12878 validation
+for (i in c(5,7,8,9)){
+  print(i)
+  specs <- colnames(filtered_net_table_gm12878)[i]
+  print(specs)
+  curve <- evalmod(scores = filtered_net_table_gm12878[,i], labels = as.factor(filtered_net_table_gm12878$chipseq),modnames = c(specs), posclass = 1)
+  autoplot(curve)
+  aucs <- precrec::auc(curve)
+  print(aucs)
+  
+}
+```
+
+Calculate the percentage improvement in the ROC of EGRET with PPI and expression data compared to that of EGRET without PPI and expression data.
+```{r}
+# percentage improvement= (abs(egret_message_passing - egret_prior)/egret_prior))*100 
+perc_improvement <- (abs(0.6031124	-0.5939087)/0.5939087)*100
+perc_improvement
+```
+
+
+
+# Addressing comment R3.8
+*``In section 2.1, the authors construct GRNs for GM12878 and K562, then compare the edge disruption scores to a differential chip-seq network to validate that the EGRET approach is working. These results (Chip-seq and the ASE analyses) could simply be a validation of using QBIC-Pred, and does not illustrate the gain in information when using the entire GRN. At a minimum, the authors should do some comparisons to demonstrate the impact/benefit of including the GRN component.''*
+
+As an example, we show that different communities exist within the EGRET networks of an individual network of a Yoruba individual. These communities are enriched for different functional processes. This shows that the global network structure is useful to provide context for interpretation for where mutations and disrupted regualtory edges reside.
+
+Interactive plots are shown below, and statuc plots are saved and incldued in the supplement with only the top GO terms labeled.
+
+
+
+
+```{r}
+alpaca <- read.table("~/EGRET/final_egret_v1_banovich/alpaca/iPSC-CM_18_ALPACA_final_memb.txt", sep = "\t", header = FALSE)
+colnames(alpaca) <- c("node","com")
+alpaca <- separate(alpaca, node, c("gene", "type"), "_", remove = FALSE)
+head(alpaca)
+# see whcih community CSRP1 is in
+alpaca[which(alpaca$gene == "ENSG00000159176"),]
+alpaca[which(alpaca$type == "B"),]
+
+gostres1 <- gost(query =alpaca$gene[which((alpaca$com == 1)&(alpaca$type=="B"))], organism = "hsapiens", significant = TRUE, custom_bg = alpaca$gene[which(alpaca$type=="B")],sources = c("GO:BP", "REAC","KEGG"))
+gostres1
+p1 <- gostplot(gostres1, capped = FALSE, interactive = FALSE)
+pp1 <- publish_gostplot(p1, highlight_terms = gostres1$result$term_id[which(gostres1$result$p_value<1e-15)], width = 10, height = 7, filename = "go_community1b.pdf" )
+gostplot(gostres1, capped = FALSE, interactive = TRUE)
+
+gostres2 <- gost(query =alpaca$gene[which((alpaca$com == 2)&(alpaca$type=="B"))], organism = "hsapiens", significant = TRUE, custom_bg = alpaca$gene[which(alpaca$type=="B")],sources = c("GO:BP", "REAC","KEGG"))
+gostres2
+p2 <- gostplot(gostres2, capped = FALSE, interactive = FALSE)
+pp2 <- publish_gostplot(p2, highlight_terms = gostres2$result$term_id[which(gostres2$result$p_value<1e-5)], width = 10, height = 7, filename = "go_community2b.pdf" )
+gostplot(gostres2, capped = FALSE, interactive = TRUE)
+
+gostres3 <- gost(query =alpaca$gene[which((alpaca$com == 3)&(alpaca$type=="B"))], organism = "hsapiens", significant = TRUE, custom_bg = alpaca$gene[which(alpaca$type=="B")],sources = c("GO:BP", "REAC","KEGG"))
+gostres3
+p3 <- gostplot(gostres3, capped = FALSE, interactive = FALSE)
+pp3 <- publish_gostplot(p3, highlight_terms = gostres3$result$term_id[which(gostres3$result$p_value<1e-5)], width = 10, height = 7, filename = "go_community3b.pdf" )
+gostplot(gostres3, capped = FALSE, interactive = TRUE)
+```
+
+```{r}
+gostres_clusters <- gost(query =list(alpaca$gene[which((alpaca$com == 1)&(alpaca$type=="B"))],alpaca$gene[which((alpaca$com == 2)&(alpaca$type=="B"))],alpaca$gene[which((alpaca$com == 3)&(alpaca$type=="B"))]), organism = "hsapiens", significant = TRUE, custom_bg = alpaca$gene[which(alpaca$type=="B")],sources = c("GO:BP", "REAC","KEGG"), multi_query = FALSE)
+gostres_clusters$result
+gostplot(gostres_clusters, capped = FALSE, interactive = TRUE)
+write.table(as.data.frame(gostres_clusters$result)[,c(1,2,3,4,5,6,9,10,11)], file = "../tables/additional_table_review_GO_indiv_18.txt",quote = FALSE, col.names = TRUE, row.names = FALSE, sep = "\t")
+```
+
+# Addressing comment R1.11
+
+*"Line 235-237. The authors labeled TFs as CAD or Chron’s. How many TFs were labeled this way for either disease? Given that both diseases have a significant inflammatory component, was there overlap in the TFs?"*
+
+
+To address this comment we  determine the overlap in TFs associated with CD and CAD and make a Venn diagram.
+
+```{r}
+
+# load gene annotation to assign gene id to gene name
+nameGeneMap <- read.table("../annotation/geneID_name_map.txt", header = FALSE)
+colnames(nameGeneMap) <- c("gene","name")
+
+# load GWAS genes for CAD and CD
+CD <- read.table("~/EGRET/final_egret_v1_banovich/gwas/CD_gwas_parsed.txt", header = FALSE,  sep = "\t")
+colnames(CD) <- c("CDtrait","name")
+CD$gene <- nameGeneMap$gene[match(CD$name, nameGeneMap$name)]
+CAD <- read.table("~/EGRET/final_egret_v1_banovich/gwas/CAD_gwas_parsed.txt", header = FALSE,  sep = "\t")
+colnames(CAD) <- c("CADtrait","name")
+CAD$gene <- nameGeneMap$gene[match(CAD$name, nameGeneMap$name)]
+
+# number of CD and CAD genes
+CAD_genes <- as.vector(unique(CAD$name))
+CD_genes <- as.vector(unique(CD$name))
+
+# make venn diagram
+vennList <- list(CD = CD_genes, CAD = CAD_genes)
+
+# 2D Venn diagram
+p <- ggvenn(vennList)
+p
+pdf("../figures/CD_CAD_TF_overlap_venn.pdf",width =4, height = 4)
+plot(p)
+dev.off()
+```
+
+
+# Addressing comment R2.2.2
+
+*"Conversely for the second benchmark (Section 2.2), I wonder whether this result is dependent on the eQTL component of the model. Are these results dependent on the integration of (tissue-specific) eQTL signals or do these reflect the differences in expression level and gene-gene covariance?"*
+
+To address this, we will look at the cell type-specificity of the eQTLs that went into Eij for each of the three cell type networks. If there are plenty of cell type specific eQTLs, we can make the argument that the genetic (eQTL) signal is contributing.
+
+Get the eQTLs for each cell type which cause modifications to the prior. These are eQTLs in promoters adjacent eGenes which are at SNP locations in the Yoruba SNP dataset.
+
+```{r}
+qbic_LCL <- read.table(file = "~/EGRET/final_egret_v1_banovich/inputs/qbic_banovich_LCL_allModels_smart1.txt", header = FALSE)
+colnames(qbic_LCL) <- c("snpID",	"tf",	"gene",	"qbicEffectSize","qbicEffect")
+qbic_iPSC <- read.table(file = "~/EGRET/final_egret_v1_banovich/inputs/qbic_banovich_iPSC_allModels_smart1.txt", header = FALSE)
+colnames(qbic_iPSC) <- c("snpID",	"tf",	"gene",	"qbicEffectSize","qbicEffect")
+qbic_CM <- read.table(file = "~/EGRET/final_egret_v1_banovich/inputs/qbic_banovich_iPSC-CM_allModels_smart1.txt", header = FALSE)
+colnames(qbic_CM) <- c("snpID",	"tf",	"gene",	"qbicEffectSize","qbicEffect")
+
+# number of CD and CAD genes
+CM <- as.vector(unique(qbic_CM$snpID))
+iPSC <- as.vector(unique(qbic_iPSC$snpID))
+LCL <- as.vector(unique(qbic_LCL$snpID))
+# make venn diagram
+vennList <- list(CM=CM, iPSC=iPSC, LCL=LCL)
+p <- ggvenn(vennList)
+pdf("../figures/celltype_eqtl_overlap_venn.pdf",width =6, height = 6)
+plot(p)
+dev.off()
+```
+
+# overlap in edge modifications between gm12878 and k562
+```{r}
+mods_g <- read.table("../outputs/edge_modifications_EGRET_allQBiCModels_gm12878_10142020.txt", header = FALSE)
+mods_k <- read.table("../outputs/edge_modifications_EGRET_allQBiCModels_k562_10142020.txt", header = FALSE)
+dim(mods_g)
+dim(mods_k)
+length(intersect(mods_g$V3, mods_k$V3))
+```

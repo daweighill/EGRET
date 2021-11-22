@@ -26,7 +26,7 @@ library(dplyr)
 library(pandaR)
 
 # this tag should indicate the genotype and the date
-tag <- "EGRET_allQBiCModels_gm12878_10142020"
+tag <- "EGRET_allQBiCModels_gm12878_sensitivity_motif_1e-5_08202021"
 
 # make a name for log file
 logfile <- paste0("../outputs/log_",tag,".txt")
@@ -50,7 +50,7 @@ General inputs:
 ```{r general_inputs}
 
 # general motif prior
-motif <- load("../inputs/panda_motif_prior_finalEGRET_v1.RData")
+motif <- load("../inputs/panda_motif_prior_sensitivity_1e-5.RData")
 
 # population-level expression data
 expr <- load("../inputs/expr_data_finalEGRET_v1_06172020.RData")

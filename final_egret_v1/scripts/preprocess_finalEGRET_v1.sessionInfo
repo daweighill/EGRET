@@ -1,0 +1,35 @@
+R version 3.6.1 (2019-07-05)
+Platform: x86_64-pc-linux-gnu (64-bit)
+Running under: Ubuntu 18.04.2 LTS
+
+Matrix products: default
+BLAS:   /usr/lib/x86_64-linux-gnu/openblas/libblas.so.3
+LAPACK: /usr/lib/x86_64-linux-gnu/libopenblasp-r0.2.20.so
+
+locale:
+ [1] LC_CTYPE=C.UTF-8       LC_NUMERIC=C           LC_TIME=C.UTF-8       
+ [4] LC_COLLATE=C.UTF-8     LC_MONETARY=C.UTF-8    LC_MESSAGES=C.UTF-8   
+ [7] LC_PAPER=C.UTF-8       LC_NAME=C              LC_ADDRESS=C          
+[10] LC_TELEPHONE=C         LC_MEASUREMENT=C.UTF-8 LC_IDENTIFICATION=C   
+
+attached base packages:
+[1] parallel  stats4    stats     graphics  grDevices utils     datasets 
+[8] methods   base     
+
+other attached packages:
+[1] data.table_1.12.2    tidyr_1.0.2          dplyr_0.8.5         
+[4] GenomicRanges_1.36.1 GenomeInfoDb_1.20.0  IRanges_2.18.1      
+[7] S4Vectors_0.22.0     BiocGenerics_0.30.0 
+
+loaded via a namespace (and not attached):
+ [1] Rcpp_1.0.7             knitr_1.33             XVector_0.24.0        
+ [4] magrittr_2.0.1         zlibbioc_1.30.0        tidyselect_1.0.0      
+ [7] R6_2.4.0               rlang_0.4.11           stringr_1.4.0         
+[10] tools_3.6.1            xfun_0.24              ellipsis_0.3.2        
+[13] htmltools_0.4.0        yaml_2.2.0             digest_0.6.27         
+[16] assertthat_0.2.1       lifecycle_1.0.0        tibble_3.0.1          
+[19] crayon_1.3.4           GenomeInfoDbData_1.2.1 purrr_0.3.3           
+[22] vctrs_0.3.1            bitops_1.0-6           RCurl_1.98-1.1        
+[25] glue_1.3.1             evaluate_0.14          rmarkdown_2.9         
+[28] stringi_1.4.3          pillar_1.4.4           compiler_3.6.1        
+[31] pkgconfig_2.0.3       

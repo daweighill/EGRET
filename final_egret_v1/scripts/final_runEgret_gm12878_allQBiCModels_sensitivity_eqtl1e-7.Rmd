@@ -26,7 +26,7 @@ library(dplyr)
 library(pandaR)
 
 # this tag should indicate the genotype and the date
-tag <- "EGRET_allQBiCModels_gm12878_10142020"
+tag <- "EGRET_allQBiCModels_gm12878_sensitivity_eqtl_1e-7_08202021"
 
 # make a name for log file
 logfile <- paste0("../outputs/log_",tag,".txt")
@@ -59,7 +59,7 @@ expr <- load("../inputs/expr_data_finalEGRET_v1_06172020.RData")
 ppi <- read.table("../inputs/ppi.txt", header = FALSE, sep = "\t")
 
 # population-level QTL data
-qtl <- read.table("../inputs/eQTL_in_motif_promotor_adjacent_egene_finalEGRET_v1_06172020.txt", header = FALSE)
+qtl <- read.table("../inputs/eQTL_1e-07_in_motif_promotor_adjacent_egene_sensitivity_08182021.txt", header = FALSE)
 
 ```
 

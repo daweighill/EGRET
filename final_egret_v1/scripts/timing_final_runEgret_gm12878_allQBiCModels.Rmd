@@ -26,16 +26,17 @@ library(dplyr)
 library(pandaR)
 
 # this tag should indicate the genotype and the date
-tag <- "EGRET_allQBiCModels_gm12878_10142020"
+tag <- "timing_EGRET_allQBiCModels_gm12878_08162021"
 
-# make a name for log file
-logfile <- paste0("../outputs/log_",tag,".txt")
-
-writeLines(capture.output(sessionInfo()), "final_runEgret_gm12878_allQBiCModels.sessionInfo")
+write("runEGRET script start", file="runEGRET_timing.txt")
+write(capture.output(Sys.time()), file="runEGRET_timing.txt", append=TRUE)
 ```
 
 # Inputs
-
+```{r}
+write("read inputs and make prior", file="runEGRET_timing.txt", append=TRUE)
+write(capture.output(Sys.time()), file="runEGRET_timing.txt", append=TRUE)
+```
 Individual inputs:
 ```{r individual_inputs}
 
@@ -171,7 +172,7 @@ mods$absQtlQffect_altAlleleCount_qbicEffect <- absQtlQffect_altAlleleCount_qbicE
 # number of edited edges
 edits <- dim(mods[which(mods$absQtlQffect_altAlleleCount_qbicEffect != 0),])[1]
 message <- paste0("Number of edited edges: ",edits)
-write(c(message), file = logfile, append = TRUE)
+#write(c(message), file = logfile, append = TRUE)
 
 # write edited prior edges to file
 mod_edges_file <- paste0("../outputs/edge_modifications_",tag,".txt")
@@ -207,6 +208,10 @@ write.table(combined, file = priorfile, col.names = TRUE, row.names = FALSE, sep
 
 
 # Run PANDA Message Passing 
+```{r}
+write("run message passing", file="runEGRET_timing.txt", append=TRUE)
+write(capture.output(Sys.time()), file="runEGRET_timing.txt", append=TRUE)
+```
 
 ```{r run_message_passing}
 processes <- c(1,2)
@@ -219,4 +224,9 @@ mclapply(processes, function(p) {
   regnet <- results@regNet
   save(regnet, file = filename)
 }, mc.cores = 2,mc.preschedule=TRUE)
+```
+# Run PANDA Message Passing 
+```{r}
+write("end", file="runEGRET_timing.txt", append=TRUE)
+write(capture.output(Sys.time()), file="runEGRET_timing.txt", append=TRUE)
 ```

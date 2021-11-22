@@ -1,0 +1,366 @@
+---
+title: "EGRET Sensitivity Analysis"
+author: "Deborah Weighill"
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+  html_notebook:
+    df_print: paged
+    theme: cosmo
+    toc: yes
+---
+AUC for ChIP-seq prediction when using different thresholds for motif prior and eQTLs.
+
+# Load libraries
+```{r}
+library(reshape2)
+library(rtracklayer)
+library(tidyr)
+library(ggplot2)
+library(pROC)
+library(reshape)
+library(PRROC)
+library(dplyr)
+library(GenomicRanges)
+library(precrec)
+library(ggpubr)
+```
+
+
+# Make Panda/EGRET edge table
+
+Load regnets from using standard motif prior
+
+
+```{r echo=FALSE,results='hide'}
+
+# panda standard
+load("../outputs/EGRET_allQBiCModels_gm12878_10142020_panda.RData")
+net <- melt(regnet)
+colnames(net) = c("tf","gene","score")
+net$id <- paste0(net$tf,net$gene)
+
+regnet_edge_table_standard <- as.data.frame(net$id)
+colnames(regnet_edge_table_standard) <- c("id")
+regnet_edge_table_standard$tf <- as.vector(net$tf)
+regnet_edge_table_standard$gene <- as.vector(net$gene)
+regnet_edge_table_standard$panda_standard <- as.vector(net$score)
+
+#list of the file names of the rest of the networks
+files <- c("EGRET_allQBiCModels_gm12878_10142020_egret.RData",
+"EGRET_allQBiCModels_gm12878_sensitivity_eqtl_1e-6_08202021_egret.RData",
+"EGRET_allQBiCModels_gm12878_sensitivity_eqtl_1e-7_08202021_egret.RData")
+
+#nicknames of the networks
+names <- c("egret_standard","egret_eqtl_6","egret_eqtl_7")
+
+for (p in c(1:3)) {
+  filename <- paste0("../outputs/",files[p])
+  netname <- names[p]
+  print(netname)
+  load(filename)
+  net <- melt(regnet)
+  colnames(net) = c("tf","gene","score")
+  net$id <- paste0(net$tf,net$gene)
+  if(all.equal(as.vector(regnet_edge_table_standard$id),as.vector(net$id))){
+    print(p)
+    regnet_edge_table_standard$tempID <- as.vector(net$score)
+    colnames(regnet_edge_table_standard)[colnames(regnet_edge_table_standard) == "tempID"] <- netname
+  }
+}
+save(regnet_edge_table_standard, file = "../outputs/egret_sensitivity_analysis_table_standardMotif.RData")
+```
+
+
+Load regnets from using standard motif 1e-5
+
+```{r echo=FALSE,results='hide'}
+
+# panda standard
+load("../outputs/EGRET_allQBiCModels_gm12878_sensitivity_motif_1e-5_08202021_panda.RData")
+net <- melt(regnet)
+colnames(net) = c("tf","gene","score")
+net$id <- paste0(net$tf,net$gene)
+
+regnet_edge_table_motif5 <- data.frame(net$id)
+colnames(regnet_edge_table_motif5) <- c("id")
+regnet_edge_table_motif5$tf <- as.vector(net$tf)
+regnet_edge_table_motif5$gene <- as.vector(net$gene)
+regnet_edge_table_motif5$panda_motif5 <- as.vector(net$score)
+
+#list of the file names of the rest of the networks
+files <- c("EGRET_allQBiCModels_gm12878_sensitivity_motif_1e-5_08202021_egret.RData")
+
+#nicknames of the networks
+names <- c("egret_motif_5")
+
+for (p in c(1:1)) {
+  filename <- paste0("../outputs/",files[p])
+  netname <- names[p]
+  print(netname)
+  load(filename)
+  net <- melt(regnet)
+  colnames(net) = c("tf","gene","score")
+  net$id <- paste0(net$tf,net$gene)
+  if(all.equal(as.vector(regnet_edge_table_motif5$id),as.vector(net$id))){
+    print(p)
+    regnet_edge_table_motif5$tempID <- as.vector(net$score)
+    colnames(regnet_edge_table_motif5)[colnames(regnet_edge_table_motif5) == "tempID"] <- netname
+  }
+}
+save(regnet_edge_table_motif5, file = "../outputs/egret_sensitivity_analysis_table_motif5.RData")
+```
+
+
+```{r echo=FALSE,results='hide'}
+
+# panda standard
+load("../outputs/EGRET_allQBiCModels_gm12878_sensitivity_motif_1e-6_08202021_panda.RData")
+net <- melt(regnet)
+colnames(net) = c("tf","gene","score")
+net$id <- paste0(net$tf,net$gene)
+
+regnet_edge_table_motif6 <- data.frame(net$id)
+colnames(regnet_edge_table_motif6) <- c("id")
+regnet_edge_table_motif6$tf <- as.vector(net$tf)
+regnet_edge_table_motif6$gene <- as.vector(net$gene)
+regnet_edge_table_motif6$panda_motif6 <- as.vector(net$score)
+
+#list of the file names of the rest of the networks
+files <- c("EGRET_allQBiCModels_gm12878_sensitivity_motif_1e-6_08202021_egret.RData")
+
+#nicknames of the networks
+names <- c("egret_motif_6")
+
+for (p in c(1:1)) {
+  filename <- paste0("../outputs/",files[p])
+  netname <- names[p]
+  print(netname)
+  load(filename)
+  net <- melt(regnet)
+  colnames(net) = c("tf","gene","score")
+  net$id <- paste0(net$tf,net$gene)
+  if(all.equal(as.vector(regnet_edge_table_motif6$id),as.vector(net$id))){
+    print(p)
+    regnet_edge_table_motif6$tempID <- as.vector(net$score)
+    colnames(regnet_edge_table_motif6)[colnames(regnet_edge_table_motif6) == "tempID"] <- netname
+  }
+}
+save(regnet_edge_table_motif6, file = "../outputs/egret_sensitivity_analysis_table_motif6.RData")
+```
+
+```{r}
+load("../outputs/egret_sensitivity_analysis_table_standardMotif.RData")
+load("../outputs/egret_sensitivity_analysis_table_motif5.RData")
+load("../outputs/egret_sensitivity_analysis_table_motif6.RData")
+```
+
+# Load ChIP-seq data
+We load the chipseq data and make a ground truth regulatory network for validation.
+
+```{r echo=FALSE,results='hide'}
+# read in the gene annotation file with gene ranges.
+genes <- read.table("../annotation/ensembl_genes_from_ucsc.txt", header = TRUE,sep = "\t")
+genes$promotorLeft <- ifelse(genes$strand == "+", (genes$txStart + 1 - 750), (genes$txEnd-250))
+genes$promotorRight <- ifelse(genes$strand == "+", (genes$txStart + 1 + 250), (genes$txEnd+750))
+gr_genes_promotor <- GRanges(seqnames = genes$chrom, ranges = IRanges(start = genes$promotorLeft, end = genes$promotorRight), strand = NULL, mcols = genes[,13:15])
+
+# GM12878 chipseq data
+gr_chipseq_gm12878 <- import("../chipseq/GM12878_remap2018_all_macs2_hg19_v1_2.bed")
+overlaps_gm12878 <- data.frame(findOverlaps(gr_chipseq_gm12878, gr_genes_promotor))
+overlaps_gm12878$tf_name <- gr_chipseq_gm12878$name[overlaps_gm12878$queryHits]
+overlaps_gm12878$gene_name <- gr_genes_promotor$mcols.name2[overlaps_gm12878$subjectHits]
+validation_regnet_gm12878 <- separate(overlaps_gm12878, tf_name, c("exp", "tf", "cell line"), "\\.")
+chipseq_regnet_gm12878 <- distinct(validation_regnet_gm12878[,c("tf","gene_name")])
+chipseq_regnet_gm12878$id <- paste0(chipseq_regnet_gm12878$tf,chipseq_regnet_gm12878$gene)
+```
+
+# Overlap networks with ChIP-seq data
+```{r echo=FALSE,results='hide'}
+filtered_net_table_standard <- regnet_edge_table_standard[(regnet_edge_table_standard$tf %in% chipseq_regnet_gm12878$tf) ,]
+filtered_net_table_standard$chipseq <- ifelse(filtered_net_table_standard$id %in% chipseq_regnet_gm12878$id,1,0)
+
+filtered_net_table_motif5 <- regnet_edge_table_motif5[(regnet_edge_table_motif5$tf %in% regnet_edge_table_motif5$tf) ,]
+filtered_net_table_motif5$chipseq <- ifelse(filtered_net_table_motif5$id %in% chipseq_regnet_gm12878$id,1,0)
+
+filtered_net_table_motif6 <- regnet_edge_table_motif6[(regnet_edge_table_motif6$tf %in% regnet_edge_table_motif6$tf) ,]
+filtered_net_table_motif6$chipseq <- ifelse(filtered_net_table_motif6$id %in% chipseq_regnet_gm12878$id,1,0)
+```
+
+
+# Calculate edge differences (edge disruption scores)
+
+```{r echo=FALSE,results='hide'}
+filtered_net_table_standard$diff_standard <- abs(filtered_net_table_standard$egret_standard - filtered_net_table_standard$panda_standard)
+filtered_net_table_standard$diff_eqtl6 <- abs(filtered_net_table_standard$`egret_eqtl_1e-6` - filtered_net_table_standard$panda_standard)
+filtered_net_table_standard$diff_eqtl7 <- abs(filtered_net_table_standard$`egret_eqtl_1e-7` - filtered_net_table_standard$panda_standard)
+
+filtered_net_table_motif5$diff_motif5 <- abs(filtered_net_table_motif5$egret_motif_5 - filtered_net_table_motif5$panda_motif5)
+
+filtered_net_table_motif6$diff_motif6 <- abs(filtered_net_table_motif6$egret_motif_6 - filtered_net_table_motif6$panda_motif6)
+```
+
+
+# Validate networks against ChIP-seq
+
+Plot ROC/PR curves for each PANDA and EGRET nework, as well as table of AUCs and PRs
+```{r}
+# standard motif with standard eQTL, eQTL6 and eQTL7
+for (i in c(4,5,6,7)){
+  print(i)
+  specs <- colnames(filtered_net_table_standard)[i]
+  print(specs)
+  curve <- evalmod(scores = filtered_net_table_standard[,i], labels = as.factor(filtered_net_table_standard$chipseq),modnames = c(specs))
+  autoplot(curve)
+  aucs <- precrec::auc(curve)
+  print(aucs)
+}
+```
+
+```{r,results='hide',fig.show=TRUE}
+pallet <- c("#FFBF00",  "#870E75"  ,  "#0BB19F" )
+names <- c("eQTL_1","eQTL_2","eQTL_3")
+aucs <- c(0.6031124,0.6031019,0.6031053)
+data <- data.frame(cbind(names, aucs), stringsAsFactors = FALSE)
+data
+p1 <- ggplot(data = data, aes(x = names, y = as.numeric(aucs))) + geom_bar(stat="identity", fill = pallet[3]) + theme_bw()  +  theme(text = element_text(size=12))  +  geom_text(aes(label=signif(as.numeric(aucs),6),vjust = -1) )+  scale_x_discrete("eQTL significance threshold",labels=c("p ~< 1e-5*","p < 1e-6","p < 1e-7")) +  labs(y = "AUC", title = "Global sensitivity analysis - eQTLs") + ylim(0,0.7)
+p1
+
+
+
+
+```
+
+```{r}
+ # motif5
+for (i in c(4,5)){
+  print(i)
+  specs <- colnames(filtered_net_table_motif5)[i]
+  print(specs)
+  curve <- evalmod(scores = filtered_net_table_motif5[,i], labels = as.factor(filtered_net_table_motif5$chipseq),modnames = c(specs))
+  autoplot(curve)
+  aucs <- precrec::auc(curve)
+  print(aucs)
+}
+```
+
+
+```{r}
+ # motif6
+for (i in c(4,5)){
+  print(i)
+  specs <- colnames(filtered_net_table_motif6)[i]
+  print(specs)
+  curve <- evalmod(scores = filtered_net_table_motif6[,i], labels = as.factor(filtered_net_table_motif6$chipseq),modnames = c(specs))
+  autoplot(curve)
+  aucs <- precrec::auc(curve)
+  print(aucs)
+}
+```
+
+
+
+# Validate likely variant-impacted edges
+
+```{r,results='hide',fig.show=TRUE}
+
+names <- c("eqtl5","eqtl6","eqtl7")
+diff_cols <- c(9,10,11)
+egret_net_nums <- c(5,6,7)
+panda_net_nums <- c(4,4,4)
+chipseq_col <- 8
+get_roc_for_diff_thresh <- function(egretNum) {
+  diffcolnum <- diff_cols[egretNum]
+  egretcol <- egret_net_nums[egretNum]
+  panda_col <- panda_net_nums[egretNum]
+  
+  top_diff_table <- filtered_net_table_standard[(filtered_net_table_standard[,c(diffcolnum)]>0.35),c(panda_col,egretcol,chipseq_col)]
+  scores <- join_scores(top_diff_table[,1],top_diff_table[,2])
+  labels <- join_labels(top_diff_table[,3],top_diff_table[,3])
+  specs <- paste0(names[egretNum],", thresh: ",0.35)
+  
+  rocP <- roc(top_diff_table$chipseq, top_diff_table[,1], auc = TRUE, direction = "<")
+  rocE <- roc(top_diff_table$chipseq, top_diff_table[,2],auc = TRUE, direction = "<")
+  test <- roc.test(rocP, rocE, alternative = "less", method = "delong" )
+  pandaAUC <- test$estimate["AUC of roc1"]
+  egretAUC <- test$estimate["AUC of roc2"]
+  pval <- test$p.value
+  print(paste(egretNum,0.35,pval))
+  
+  curve_data <- mmdata(scores, labels,modnames = c("panda", specs), dsids = c(1, 2))
+  curves <- evalmod(curve_data)
+  nn <- attr(curves$rocs,"data_info")$nn[1]
+  np <- attr(curves$rocs,"data_info")$np[1]
+  result <- c(egretNum, names[egretNum], 0.35, nn, np, pandaAUC, egretAUC, pval)
+  return(result)
+  autoplot(curves)
+}
+egret_priors <- c(1:3)
+egret_auc_pvals_gm12878 <- data.frame()
+
+for (p in egret_priors){
+    result <- get_roc_for_diff_thresh(p)
+    df <- data.frame(t(result), stringsAsFactors = FALSE)
+    egret_auc_pvals_gm12878 <- rbind(egret_auc_pvals_gm12878,df)
+  }
+
+colnames(egret_auc_pvals_gm12878) <- c("egretNum", "name", "thresh", "nn", "np", "pandaAUC", "egretAUC", "pval")
+egret_auc_pvals_gm12878
+
+egret_auc_pvals_gm12878$improvement <-(as.numeric(egret_auc_pvals_gm12878$egretAUC)-as.numeric(egret_auc_pvals_gm12878$pandaAUC))
+egret_auc_pvals_gm12878
+```
+
+
+
+```{r,results='hide',fig.show=TRUE}
+pallet <- c("#FFBF00",  "#870E75"  ,  "#0BB19F" )
+names <- c("eQTL_1e-5","eQTL_1e-6","eQTL_1e-7")
+nums <- c(57+65,45+57,32+47)
+aucs
+data <- data.frame(cbind(names, aucs), stringsAsFactors = FALSE)
+data
+p3 <- ggplot(data = data, aes(x = names, y = as.numeric(nums))) + geom_bar(stat="identity", fill = pallet[3]) + theme_bw()  +  theme(text = element_text(size=12))  +  geom_text(aes(label=signif(as.numeric(nums)),vjust = -1) )+  scale_x_discrete("eQTL significance threshold",labels=c("p ~< 1e-5*","p < 1e-6","p < 1e-7")) +  labs(y = "Number of edited edges", title = "Edited edges with ChIP-seq TFs at different eQTL thresholds") + ylim(0,130)
+p3
+
+#pdf("../figures/sensitivity_eqtl_bar.pdf",width = 7, height = 4)
+#plot(p)
+#dev.off()
+```
+
+```{r}
+pallet <- c("#FFBF00",  "#870E75"  ,  "#0BB19F" )
+
+p2 <- ggplot(data = egret_auc_pvals_gm12878[order(egret_auc_pvals_gm12878$improvement),], aes(x = name, y = improvement)) + geom_bar(stat="identity", fill = pallet[3]) + theme_bw()  +  theme(text = element_text(size=12))  +  geom_text(aes(label=signif(improvement,3),vjust = -1) )+  scale_x_discrete("eQTL significance threshold",labels=c("p ~< 1e-5*","p < 1e-6","p < 1e-7")) +  labs(y = "AUC improvement", title = "Local sensitivity analysis - eQTLs") + ylim(-0,0.5)
+p2
+
+#pdf("../figures/sensitivity_eqtl.pdf",width = 4, height = 3)
+#plot(p)
+#dev.off()
+```
+```{r}
+p_ag <- ggarrange(p1,p2,p3,
+          labels = c("A", "B", "C"),
+          ncol = 2, nrow = 2)
+plot(p_ag)
+pdf("../figures/sensitivity_eqtls_ag.pdf",width = 8, height = 7)
+plot(p_ag)
+dev.off()
+```
+
+
+```{r,results='hide',fig.show=TRUE}
+
+names <- c("motif_1e-4","motif_1e-5","motif_1e-6")
+aucs <- c(0.6031124,0.53817666,0.51132608)
+data <- data.frame(cbind(names, aucs), stringsAsFactors = FALSE)
+data
+p <- ggplot(data = data, aes(x = names, y = as.numeric(aucs))) + geom_bar(stat="identity", fill = pallet[3]) + theme_bw()  +  theme(text = element_text(size=12))  +  geom_text(aes(label=signif(as.numeric(aucs),3),vjust = -1) )+  scale_x_discrete("Motif significance threshold",labels=c("p < 1e-4 (FIMO default)","p < 1e-5","p < 1e-6")) +  labs(y = "AUC", title = "Sensitivity analysis - TF motifs") + ylim(0,0.7)
+p
+
+pdf("../figures/sensitivity_motif.pdf",width = 5, height = 3)
+plot(p)
+dev.off()
+```
+

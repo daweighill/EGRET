@@ -21,7 +21,8 @@ library(tidyr)
 library(data.table)
 
 tag <- "finalEGRET_v1_timing_08132021"
-
+write("preprocess script start", file="preprocess_timing.txt")
+write(capture.output(Sys.time()), file="preprocess_timing.txt", append=TRUE)
 writeLines(capture.output(sessionInfo()), "preprocess_finalEGRET_v1.sessionInfo")
 ```
 
@@ -362,4 +363,9 @@ Uniquefy SNPs so that we don't run qbic more than we have to. Some SNPs appear m
 
 ```{r}
 system("cat /home/ubuntu/EGRET/final_egret_v1/genotype_data/K562_snps_in_motifs_in_promotor.txt /home/ubuntu/EGRET/final_egret_v1/genotype_data/NA12878_snps_in_motifs_in_promotor.txt | sort -u >/home/ubuntu/EGRET/final_egret_v1/genotype_data/NA12878_K562_snps_in_motifs_in_promotor_finalEGRET_v1_06172020.vcf")
+```
+
+```{r}
+write("preprocess script end", file="preprocess_timing.txt", append=TRUE)
+write(capture.output(Sys.time()), file="preprocess_timing.txt", append=TRUE)
 ```
